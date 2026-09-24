@@ -678,7 +678,7 @@ export class SceneEngine {
     }
     const moving = ids.some((id) => !held.has(id) && !this.sleeping.has(id) && this.nodes.get(id)?.visible);
     if (!moving && held.size === 0) return;
-    this.keepOnTable();
+    this.keepOnTable(held);
 
     const resting = new Set<string>();
     for (let pass = 0; pass < 3; pass += 1) {
@@ -717,12 +717,12 @@ export class SceneEngine {
     }
   }
 
-  private keepOnTable(): void {
+  private keepOnTable(held: Set<string>): void {
     const maxX = TABLE_WIDTH * 0.5;
     const maxZ = TABLE_DEPTH * 0.5;
     const z0 = this.table.position.z;
     for (const [id, node] of this.nodes) {
-      if (!node.visible) continue;
+      if (!node.visible || held.has(id)) continue;
       this.boxA.setFromObject(node);
       let dx = 0;
       let dy = 0;

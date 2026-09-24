@@ -3,6 +3,24 @@ import { DebugHud, LeftPanel, NoticeToast, RightPanel } from "@/components/studi
 import { pushCommand } from "@/studio/commands";
 import { useLive, useStudio } from "@/studio/store";
 
+async function openFullscreen(element: HTMLElement): Promise<boolean> {
+  const webkit = element as HTMLElement & { webkitRequestFullscreen?: () => void | Promise<void> };
+  try {
+    if (element.requestFullscreen) {
+      await element.requestFullscreen({ navigationUI: "hide" });
+      return document.fullscreenElement === element;
+    }
+    if (webkit.webkitRequestFullscreen) {
+      const result = webkit.webkitRequestFullscreen();
+      if (result && typeof result.then === "function") await result;
+      return document.fullscreenElement === element;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 export function StudioApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -29,25 +47,16 @@ export function StudioApp() {
   async function toggleStage() {
     const stage = stageRef.current;
     if (!stage) return;
-    if (document.fullscreenElement === stage || fill) {
+    if (document.fullscreenElement || fill) {
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
       setFill(false);
       return;
     }
-    const webkit = stage as HTMLElement & { webkitRequestFullscreen?: () => void | Promise<void> };
-    const request = stage.requestFullscreen?.bind(stage) ?? webkit.webkitRequestFullscreen?.bind(stage);
-    if (request) {
-      try {
-        const result = request();
-        if (result && typeof result.then === "function") await result;
-        if (document.fullscreenElement === stage) {
-          setFill(true);
-          return;
-        }
-      } catch {
-        // iPhone Safari no permite la pantalla completa nativa.
-      }
+    if (await openFullscreen(stage) || (await openFullscreen(document.documentElement))) {
+      setFill(true);
+      return;
     }
+    window.scrollTo(0, 1);
     setFill(true);
   }
 
@@ -74,9 +83,10 @@ export function StudioApp() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-bg text-fg">
       <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:px-4">
-        <div className="flex min-w-0 items-baseline gap-3">
-          <span className="text-sm font-semibold tracking-tight sm:text-lg">cositadelocos</span>
-          <span className="hidden text-sm text-muted lg:inline">Hands studio</span>
+        <div className="flex min-w-0 items-center gap-1.5 text-sm font-semibold tracking-tight sm:text-lg">
+          <img src="/logo-chair.png" alt="" className="h-[1.15em] w-auto" />
+          <span>cositadelocos</span>
+          <span className="hidden text-sm font-normal text-muted lg:inline">Hands studio</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="hidden items-center gap-2 font-mono text-xs text-muted sm:flex">
@@ -113,7 +123,7 @@ export function StudioApp() {
         </aside>
         <main
           ref={stageRef}
-          className={`relative min-w-0 flex-1 bg-bg [&:fullscreen]:h-screen [&:fullscreen]:w-screen ${fill ? "fixed inset-0 z-40 h-dvh w-screen" : ""}`}
+          className={`bg-black ${fill ? "fixed inset-0 z-50 h-[100lvh] w-screen" : "relative min-w-0 flex-1"}`}
         >
           <canvas ref={canvasRef} className="h-full w-full touch-none" />
           <video ref={videoRef} playsInline muted autoPlay className="pointer-events-none absolute h-px w-px opacity-0" />

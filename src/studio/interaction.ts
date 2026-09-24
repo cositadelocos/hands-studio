@@ -1,12 +1,13 @@
-import { clamp, vdist } from "@/studio/math";
+import { vdist } from "@/studio/math";
 import type { Vec3 } from "@/studio/math";
 import type { InteractionSpace, SceneObject, Side, StudioHand } from "@/studio/types";
 
 export interface Hold {
   id: string;
   offsetX: number;
-  offsetY: number;
-  z: number;
+  offsetZ: number;
+  baseY: number;
+  imageY: number;
   span: number;
   last: Vec3;
   miss: number;
@@ -43,6 +44,12 @@ export function objectRadius(object: SceneObject): number {
   return 0.55 * scale;
 }
 
+function pinchImageY(hand: StudioHand): number {
+  const thumb = hand.image[4];
+  const index = hand.image[8];
+  if (!thumb || !index) return 0.5;
+  return (thumb.y + index.y) * 0.5;
+}
 function seenId(
   hit: RayHit | null,
   taken: (id: string) => boolean,
@@ -102,7 +109,7 @@ export function stepInteraction(
     const keep = allowManipulate && objects.some((object) => object.id === hold.id && object.visible);
     if (!keep || !hand?.pinch) {
       hold.miss += 1;
-      if (!keep || hold.miss > 20) {
+      if (!keep || hold.miss > 10) {
         delete holds[side];
         continue;
       }
@@ -112,8 +119,8 @@ export function stepInteraction(
     hold.miss = 0;
     const position: Vec3 = [
       hand.pinchPoint[0] + hold.offsetX,
-      hand.pinchPoint[1] + hold.offsetY,
-      clamp(hold.z + (hand.span - hold.span) * 1.6, hold.z - 0.55, hold.z + 0.55),
+      hold.baseY + (hold.imageY - pinchImageY(hand)) * 1.7,
+      hand.pinchPoint[2] + hold.offsetZ,
     ];
     hold.last = position;
     moves.push({ id: hold.id, position });
@@ -145,8 +152,9 @@ export function stepInteraction(
     holds[side] = {
       id: target,
       offsetX: object.position[0] - hand.pinchPoint[0],
-      offsetY: object.position[1] - hand.pinchPoint[1],
-      z: object.position[2],
+      offsetZ: object.position[2] - hand.pinchPoint[2],
+      baseY: object.position[1],
+      imageY: pinchImageY(hand),
       span: hand.span,
       last: [object.position[0], object.position[1], object.position[2]],
       miss: 0,
