@@ -5,11 +5,11 @@ import type { InteractionSpace, NormPoint } from "@/studio/types";
 const SPAN_NEAR = 0.035;
 const SPAN_RANGE = 0.16;
 /** Hands stay in front of the camera, in a band you can see head-on. */
-const HAND_HALF_X = 0.38;
-const HAND_Y_BIAS = 0.55;
-const HAND_Y_SPAN = 0.4;
-const HAND_Z_NEAR = -0.48;
-const HAND_Z_FAR = -0.7;
+const HAND_HALF_X = 0.55;
+const HAND_Y_BIAS = 0.5;
+const HAND_Y_SPAN = 0.62;
+const HAND_Z_NEAR = -0.46;
+const HAND_Z_FAR = -0.78;
 
 export function palmSpan(image: NormPoint[]): number {
   const wrist = image[0];
@@ -57,11 +57,12 @@ export function mapHand(
   handScale: number,
   span = palmSpan(image),
 ): Vec3[] {
+  const scale = handScale * 0.88;
   const anchor = mapWrist(image[0] ?? { x: 0.5, y: 0.5, z: 0 }, span, space);
   const origin = world[0] ?? [0, 0, 0];
   return world.map((point) => [
-    anchor[0] + (point[0] - origin[0]) * handScale,
-    anchor[1] + (point[1] - origin[1]) * handScale,
-    anchor[2] + (point[2] - origin[2]) * handScale,
+    anchor[0] + (point[0] - origin[0]) * scale,
+    anchor[1] + (point[1] - origin[1]) * scale,
+    anchor[2] + (point[2] - origin[2]) * scale,
   ]);
 }

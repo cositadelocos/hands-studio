@@ -51,6 +51,8 @@ function viewFrom(studio: StudioState, extra: Partial<FrameView> = {}): FrameVie
     hoveredId: null,
     stayHere: studio.stayHere,
     eyeHeight: studio.eyeHeight,
+    lookYaw: studio.lookYaw,
+    lookPitch: studio.lookPitch,
     panorama: studio.panorama,
     sky: studio.sky,
     ...extra,
@@ -82,6 +84,7 @@ export function startRuntime(
   overlay: HTMLCanvasElement,
 ): () => void {
   const engine = new SceneEngine(canvas);
+  engine.onLook = (lookYaw, lookPitch) => useStudio.getState().patch({ lookYaw, lookPitch });
   const mediapipe = new MediaPipeSource(video);
   const memory = createPipelineMemory();
   const interaction = createInteractionMemory();
@@ -254,7 +257,7 @@ export function startRuntime(
 
     const studio = useStudio.getState();
     mediapipe.invertHands = studio.invertHands;
-    engine.prepareView(studio.eyeHeight, studio.stayHere);
+    engine.prepareView(studio.eyeHeight, studio.stayHere, studio.lookYaw, studio.lookPitch);
     const cycle = Math.floor(now / 1000 / 14);
     if (mode === "demo" && studio.demoDrive && cycle !== lastCycle) {
       lastCycle = cycle;

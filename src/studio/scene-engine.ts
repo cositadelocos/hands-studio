@@ -78,6 +78,8 @@ export interface FrameView {
   hoveredId: string | null;
   stayHere: boolean;
   eyeHeight: number;
+  lookYaw: number;
+  lookPitch: number;
   panorama: PanoramaSettings | null;
   sky: SkyImage | null;
 }
@@ -196,6 +198,7 @@ export class SceneEngine {
   private selectedId: string | null = null;
   private gizmoDragging = false;
   private pointerDown: { x: number; y: number; gizmo: boolean } | null = null;
+  onLook: ((yaw: number, pitch: number) => void) | null = null;
   onSelect: ((id: string | null) => void) | null = null;
   onTransform: ((id: string, transform: TransformSnapshot) => void) | null = null;
   onRest: ((id: string, position: Vec3) => void) | null = null;
@@ -349,8 +352,9 @@ export class SceneEngine {
     const dy = event.clientY - this.lookY;
     this.lookX = event.clientX;
     this.lookY = event.clientY;
-    this.yaw -= dx * 0.005;
-    this.pitch = Math.max(-1.15, Math.min(0.7, this.pitch - dy * 0.004));
+    const yaw = Math.min(22, Math.max(-22, (this.yaw * 180) / Math.PI - dx * 0.2));
+    const pitch = Math.min(12, Math.max(-14, ((this.pitch + 0.32) * 180) / Math.PI - dy * 0.16));
+    this.onLook?.(yaw, pitch);
   };
 
   private onPointerUp = (event: PointerEvent) => {
@@ -511,8 +515,12 @@ export class SceneEngine {
     this.wall.visible = false;
   }
 
-  prepareView(eye: number, stay: boolean): void {
-    if (stay) this.applyLook(eye);
+  prepareView(eye: number, stay: boolean, lookYaw = 0, lookPitch = 0): void {
+    if (stay) {
+      this.yaw = (lookYaw * Math.PI) / 180;
+      this.pitch = -0.32 + (lookPitch * Math.PI) / 180;
+      this.applyLook(eye);
+    }
     this.camera.updateMatrixWorld(true);
     this.viewInverse.copy(this.camera.quaternion).invert();
   }

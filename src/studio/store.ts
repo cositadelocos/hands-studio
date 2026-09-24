@@ -60,6 +60,8 @@ interface Persisted {
   debug: boolean;
   invertHands: boolean;
   eyeHeight: number;
+  lookYaw: number;
+  lookPitch: number;
   transformMode: TransformMode;
   demoDrive: boolean;
   objects: SceneObject[];
@@ -155,6 +157,8 @@ export interface StudioState {
   debug: boolean;
   invertHands: boolean;
   eyeHeight: number;
+  lookYaw: number;
+  lookPitch: number;
   transformMode: TransformMode;
   demoDrive: boolean;
   stayHere: boolean;
@@ -194,6 +198,8 @@ function persist(state: StudioState): void {
     debug: state.debug,
     invertHands: state.invertHands,
     eyeHeight: state.eyeHeight,
+    lookYaw: state.lookYaw,
+    lookPitch: state.lookPitch,
     transformMode: state.transformMode,
     demoDrive: state.demoDrive,
     objects: state.objects.filter((object) => object.kind !== "model"),
@@ -214,6 +220,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   debug: saved?.debug ?? true,
   invertHands: saved?.invertHands ?? false,
   eyeHeight: saved?.eyeHeight ?? 1.25,
+  lookYaw: saved?.lookYaw ?? 0,
+  lookPitch: saved?.lookPitch ?? 0,
   transformMode: saved?.transformMode ?? "translate",
   demoDrive: saved?.demoDrive ?? true,
   stayHere: true,

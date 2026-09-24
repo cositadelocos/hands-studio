@@ -124,6 +124,25 @@ export function LeftPanel() {
             display={formatMeters(studio.eyeHeight)}
             onChange={(eyeHeight) => studio.patch({ eyeHeight })}
           />
+          <Slider
+            label="Girar"
+            min={-22}
+            max={22}
+            step={1}
+            value={studio.lookYaw}
+            display={`${Math.round(studio.lookYaw)} °`}
+            onChange={(lookYaw) => studio.patch({ lookYaw })}
+          />
+          <Slider
+            label="Mirar arriba / abajo"
+            min={-14}
+            max={12}
+            step={1}
+            value={studio.lookPitch}
+            display={`${Math.round(studio.lookPitch)} °`}
+            onChange={(lookPitch) => studio.patch({ lookPitch })}
+          />
+          <p className="mt-2 text-sm text-muted">El giro es corto. Las manos siguen la mirada.</p>
         </Section>
 
         <Section title="VISUAL">

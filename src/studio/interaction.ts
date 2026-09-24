@@ -107,13 +107,21 @@ export function stepInteraction(
     const hold = holds[side];
     if (!hold) continue;
     const keep = allowManipulate && objects.some((object) => object.id === hold.id && object.visible);
-    if (!keep || !hand?.pinch) {
+    if (!keep || !hand) {
+      if (!keep) {
+        delete holds[side];
+        continue;
+      }
       hold.miss += 1;
-      if (!keep || hold.miss > 10) {
+      if (hold.miss > 6) {
         delete holds[side];
         continue;
       }
       moves.push({ id: hold.id, position: hold.last });
+      continue;
+    }
+    if (!hand.pinch) {
+      delete holds[side];
       continue;
     }
     hold.miss = 0;

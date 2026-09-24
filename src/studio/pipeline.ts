@@ -58,7 +58,7 @@ export function advanceTracking(
     const span = previousSpan === undefined ? rawSpan : previousSpan + (rawSpan - previousSpan) * 0.22;
     memory.smooth.span[side] = span;
     const mapped = mapHand(raw.image, raw.world, settings.space, settings.handScale, span);
-    const alpha = memory.smooth.lost[side] > 4 ? 1 : settings.smoothing;
+    const alpha = memory.smooth.lost[side] > 4 ? 1 : Math.min(1, settings.smoothing + 0.28);
     const points = smoothPoints(memory.smooth.points[side], mapped, alpha);
     memory.smooth.points[side] = points;
     memory.smooth.lost[side] = 0;

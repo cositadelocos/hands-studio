@@ -81,8 +81,15 @@ export function StudioApp() {
     camera === "live" ? "Cámara" : camera === "starting" ? "Conectando" : camera === "error" ? "Sin cámara" : "Demo";
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-bg text-fg">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:px-4">
+    <div
+      className={
+        fill
+          ? "fixed inset-x-0 top-0 z-[70] flex w-screen flex-col overflow-hidden bg-bg text-fg"
+          : "flex h-dvh flex-col overflow-hidden bg-bg text-fg"
+      }
+      style={fill ? { height: `${window.screen.height}px` } : undefined}
+    >
+      <header className={`flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:px-4 ${fill ? "hidden" : ""}`}>
         <div className="flex min-w-0 items-center gap-1.5 text-sm font-semibold tracking-tight sm:text-lg">
           <img src="/logo-chair.png" alt="" className="h-[1.15em] w-auto" />
           <span>cositadelocos</span>
@@ -123,7 +130,7 @@ export function StudioApp() {
         </aside>
         <main
           ref={stageRef}
-          className={`bg-black ${fill ? "fixed inset-0 z-50 h-[100lvh] w-screen" : "relative min-w-0 flex-1"}`}
+          className="relative min-h-0 min-w-0 flex-1 bg-black"
         >
           <canvas ref={canvasRef} className="h-full w-full touch-none" />
           <video ref={videoRef} playsInline muted autoPlay className="pointer-events-none absolute h-px w-px opacity-0" />
@@ -131,7 +138,7 @@ export function StudioApp() {
             <button
               type="button"
               onClick={toggleStage}
-              className="pointer-events-auto absolute right-3 top-16 min-h-11 rounded-md border border-border bg-surface/90 px-3 text-sm text-fg sm:top-3"
+              className="pointer-events-auto absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] min-h-11 rounded-md border border-border bg-surface/90 px-3 text-sm text-fg"
             >
               {fill ? "Salir" : "Pantalla completa"}
             </button>
