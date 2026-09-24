@@ -1,5 +1,4 @@
 import {
-  ACESFilmicToneMapping,
   AxesHelper,
   Box3,
   BoxGeometry,
@@ -17,7 +16,7 @@ import {
   LineBasicMaterial,
   LineSegments,
   Mesh,
-  MeshStandardMaterial,
+  MeshLambertMaterial,
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
@@ -130,7 +129,6 @@ export class SceneEngine {
   private readonly rightAxes: AxesHelper;
   private readonly volume: LineSegments;
   private readonly floor: Mesh;
-  private readonly plinth: Mesh;
   private readonly wall: Mesh;
   private readonly grid: GridHelper;
   private readonly ring: Mesh;
@@ -162,48 +160,27 @@ export class SceneEngine {
     this.scene.background = new Color(0x0c0f12);
     this.renderer = new WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: false,
       alpha: false,
-      preserveDrawingBuffer: true,
       powerPreference: "high-performance",
     });
     this.renderer.setClearColor(0x0c0f12, 1);
     this.renderer.outputColorSpace = SRGBColorSpace;
-    this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = false;
 
     this.camera = new PerspectiveCamera(38, 1, 0.05, 30);
     this.camera.position.set(0.22, 0.58, 1.38);
 
-    const hemi = new HemisphereLight(0xd5e4ee, 0x1a140f, 0.85);
-    const key = new DirectionalLight(0xfff3e4, 2.5);
+    const hemi = new HemisphereLight(0xd5e4ee, 0x1a140f, 0.95);
+    const key = new DirectionalLight(0xfff3e4, 2.2);
     key.position.set(0.9, 2.4, 1.5);
-    key.castShadow = false;
-    const fill = new DirectionalLight(0x9fd8d4, 0.55);
-    fill.position.set(-1.4, 1.1, 0.6);
-    const rim = new DirectionalLight(0xe59a4a, 0.35);
-    rim.position.set(0.2, 1.2, -1.6);
 
-    this.floor = new Mesh(
-      new PlaneGeometry(1, 1),
-      new MeshStandardMaterial({ color: 0x1a222a, roughness: 0.92, metalness: 0 }),
-    );
+    this.floor = new Mesh(new PlaneGeometry(1, 1, 1, 1), new MeshLambertMaterial({ color: 0x1a222a }));
     this.floor.rotation.x = -Math.PI / 2;
-    this.floor.receiveShadow = true;
 
-    this.plinth = new Mesh(
-      new BoxGeometry(1, 1, 1),
-      new MeshStandardMaterial({ color: 0x10161b, roughness: 0.96, metalness: 0 }),
-    );
-    this.plinth.receiveShadow = true;
+    this.wall = new Mesh(new PlaneGeometry(1, 1, 1, 1), new MeshLambertMaterial({ color: 0x141b21 }));
 
-    this.wall = new Mesh(
-      new PlaneGeometry(1, 1),
-      new MeshStandardMaterial({ color: 0x141b21, roughness: 0.88, metalness: 0 }),
-    );
-
-    this.grid = new GridHelper(1.2, 12, 0x3c4a55, 0x243038);
+    this.grid = new GridHelper(1.2, 6, 0x3c4a55, 0x243038);
     this.grid.position.y = 0.003;
 
     this.volume = new LineSegments(
@@ -212,8 +189,8 @@ export class SceneEngine {
     );
 
     this.landmarks = new InstancedMesh(
-      new SphereGeometry(0.008, 12, 10),
-      new MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.05 }),
+      new SphereGeometry(0.008, 6, 4),
+      new MeshLambertMaterial({ color: 0xffffff }),
       42,
     );
     this.landmarks.frustumCulled = false;
@@ -228,9 +205,9 @@ export class SceneEngine {
     this.rightBones = boneLine(RIGHT);
     this.leftRay = rayLine();
     this.rightRay = rayLine();
-    const hitMaterial = new MeshStandardMaterial({ color: ACCENT, emissive: ACCENT, emissiveIntensity: 0.4 });
-    this.leftHit = new Mesh(new SphereGeometry(0.012, 12, 10), hitMaterial);
-    this.rightHit = new Mesh(new SphereGeometry(0.012, 12, 10), hitMaterial.clone());
+    const hitMaterial = new MeshLambertMaterial({ color: ACCENT, emissive: ACCENT, emissiveIntensity: 0.4 });
+    this.leftHit = new Mesh(new SphereGeometry(0.012, 6, 4), hitMaterial);
+    this.rightHit = new Mesh(new SphereGeometry(0.012, 6, 4), hitMaterial.clone());
     this.leftHit.visible = false;
     this.rightHit.visible = false;
     this.leftAxes = new AxesHelper(0.07);
@@ -239,8 +216,8 @@ export class SceneEngine {
     this.rightAxes.visible = false;
 
     this.ring = new Mesh(
-      new TorusGeometry(0.12, 0.004, 8, 40),
-      new MeshStandardMaterial({ color: ACCENT, emissive: ACCENT, emissiveIntensity: 0.35 }),
+      new TorusGeometry(0.12, 0.004, 4, 12),
+      new MeshLambertMaterial({ color: ACCENT, emissive: ACCENT, emissiveIntensity: 0.35 }),
     );
     this.ring.rotation.x = Math.PI / 2;
     this.ring.visible = false;
@@ -248,9 +225,6 @@ export class SceneEngine {
     this.world.add(
       hemi,
       key,
-      fill,
-      rim,
-      this.plinth,
       this.floor,
       this.wall,
       this.grid,
@@ -271,7 +245,7 @@ export class SceneEngine {
 
     this.orbit = new OrbitControls(this.camera, canvas);
     this.orbit.target.set(0, 0.2, 0);
-    this.orbit.enableDamping = true;
+    this.orbit.enableDamping = false;
     this.orbit.minDistance = 0.4;
     this.orbit.maxDistance = 3.4;
     this.orbit.maxPolarAngle = Math.PI * 0.49;
@@ -591,8 +565,6 @@ export class SceneEngine {
       this.spaceKey = key;
       this.floor.scale.set(space.width, space.depth, 1);
       this.floor.position.set(0, 0, space.offsetZ);
-      this.plinth.scale.set(space.width + 0.14, 0.08, space.depth + 0.14);
-      this.plinth.position.set(0, -0.04, space.offsetZ);
       this.wall.scale.set(space.width, space.height, 1);
       this.wall.position.set(0, space.height / 2, space.offsetZ - space.depth / 2 - 0.012);
       this.grid.scale.set(space.width / 1.2, 1, space.depth / 1.2);
@@ -641,7 +613,7 @@ export class SceneEngine {
       }
       node.visible = object.visible;
       node.traverse((child) => {
-        if (child instanceof Mesh && child.material instanceof MeshStandardMaterial && object.kind !== "model") {
+        if (child instanceof Mesh && child.material instanceof MeshLambertMaterial && object.kind !== "model") {
           child.material.color.set(object.color);
         }
       });
@@ -651,18 +623,13 @@ export class SceneEngine {
   private createPrimitive(object: SceneObject): Mesh {
     const geometry =
       object.kind === "sphere"
-        ? new SphereGeometry(0.5, 16, 12)
+        ? new SphereGeometry(0.5, 8, 6)
         : object.kind === "torus"
-          ? new TorusGeometry(0.36, 0.13, 10, 20)
+          ? new TorusGeometry(0.36, 0.13, 6, 10)
           : object.kind === "cylinder"
-            ? new CylinderGeometry(0.42, 0.42, 1, 16)
+            ? new CylinderGeometry(0.42, 0.42, 1, 8)
             : new BoxGeometry(1, 1, 1);
-    const mesh = new Mesh(
-      geometry,
-      new MeshStandardMaterial({ color: object.color, roughness: 0.4, metalness: 0.08 }),
-    );
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    const mesh = new Mesh(geometry, new MeshLambertMaterial({ color: object.color }));
     this.tag(mesh, object.id);
     return mesh;
   }
@@ -767,14 +734,14 @@ export class SceneEngine {
   private setEmissive(id: string | null, hex: number): void {
     const node = id ? this.nodes.get(id) : undefined;
     node?.traverse((child) => {
-      if (child instanceof Mesh && child.material instanceof MeshStandardMaterial) {
+      if (child instanceof Mesh && child.material instanceof MeshLambertMaterial) {
         child.material.emissive.setHex(hex);
       }
     });
   }
 
   private mountVideo(canvas: HTMLCanvasElement | null, show: boolean, revision: number): void {
-    const material = this.wall.material as MeshStandardMaterial;
+    const material = this.wall.material as MeshLambertMaterial;
     if (!show || !canvas) {
       if (material.map) {
         material.map = null;
