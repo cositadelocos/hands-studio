@@ -141,7 +141,7 @@ export function stepInteraction(
       hoveredId = aimed.id;
       hoveredBy = side;
     }
-    if (holds[side] || !hand.pinch || !allowManipulate || hand.confidence < 0.2) continue;
+    if (holds[side] || !hand.pinch || !allowManipulate || hand.confidence < 0.12) continue;
 
     let target = seenId(aimed, taken, objects);
     if (!target && hit) target = seenId(hit, taken, objects);

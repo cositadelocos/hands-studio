@@ -129,6 +129,7 @@ function viewFrom(studio: StudioState, extra: Partial<FrameView> = {}): FrameVie
     rays: {},
     moves: [],
     hoveredId: null,
+    heldId: null,
     stayHere: studio.stayHere,
     eyeHeight: studio.eyeHeight,
     lookYaw: studio.lookYaw,
@@ -398,6 +399,7 @@ export function startRuntime(
     }
 
     const fresh = useStudio.getState();
+    const grabbedId = result.holds.left?.id ?? result.holds.right?.id ?? null;
     engine.frame(
       viewFrom(fresh, {
         showVideo: false,
@@ -414,6 +416,7 @@ export function startRuntime(
         rays: result.rays,
         moves: result.moves,
         hoveredId: result.hoveredId,
+        heldId: grabbedId,
       }),
     );
 
@@ -425,7 +428,6 @@ export function startRuntime(
       }
     }
 
-    const grabbedId = result.holds.left?.id ?? result.holds.right?.id ?? null;
     const grabbingHand: Side | null = result.holds.left ? "left" : result.holds.right ? "right" : null;
     if (recorder.active) {
       recorder.push(makeSample(now, frame.source, tracked.hands, grabbingHand, fresh.selectedId, grabbedId));

@@ -76,6 +76,7 @@ export interface FrameView {
   rays: Partial<Record<Side, RayView>>;
   moves: { id: string; position: Vec3 }[];
   hoveredId: string | null;
+  heldId: string | null;
   stayHere: boolean;
   eyeHeight: number;
   lookYaw: number;
@@ -177,6 +178,7 @@ export class SceneEngine {
   private readonly wall: Mesh;
   private readonly grid: GridHelper;
   private readonly ring: Mesh;
+  private readonly holdRing: Mesh;
   private readonly room = new Group();
   private roomModel: Group | null = null;
   private roomFit = 1;
@@ -196,6 +198,7 @@ export class SceneEngine {
   private objectRef: SceneObject[] | null = null;
   private spaceKey = "";
   private hoverId: string | null = null;
+  private heldId: string | null = null;
   private selectedId: string | null = null;
   private gizmoDragging = false;
   private pointerDown: { x: number; y: number; gizmo: boolean } | null = null;
@@ -289,6 +292,13 @@ export class SceneEngine {
     );
     this.ring.rotation.x = Math.PI / 2;
     this.ring.visible = false;
+    this.holdRing = new Mesh(
+      new TorusGeometry(0.18, 0.0035, 4, 20),
+      new MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.75 }),
+    );
+    this.holdRing.rotation.x = Math.PI / 2;
+    this.holdRing.visible = false;
+    this.scene.add(this.holdRing);
     this.scene.add(this.room);
     this.photo = new Mesh(uprightSphere(), new MeshBasicMaterial({ color: 0xffffff, side: BackSide }));
     this.photo.frustumCulled = false;
@@ -380,6 +390,8 @@ export class SceneEngine {
   }
 
   pickThrough(point: Vec3): RayHit | null {
+    const near = this.nearestOnScreen(point, 0.13);
+    if (near) return near;
     this.projected.set(point[0], point[1], point[2]).project(this.camera);
     if (this.projected.x < -1.15 || this.projected.x > 1.15 || this.projected.y < -1.15 || this.projected.y > 1.15) {
       return null;
@@ -388,6 +400,25 @@ export class SceneEngine {
     this.raycaster.far = 40;
     this.raycaster.setFromCamera(this.pointer, this.camera);
     return this.firstHit(this.raycaster.intersectObjects([...this.nodes.values()], true));
+  }
+
+  private nearestOnScreen(point: Vec3, limit: number): RayHit | null {
+    this.projected.set(point[0], point[1], point[2]).project(this.camera);
+    const x = this.projected.x;
+    const y = this.projected.y;
+    if (x < -1.2 || x > 1.2 || y < -1.2 || y > 1.2) return null;
+    let best: RayHit | null = null;
+    let bestD = limit;
+    for (const [id, node] of this.nodes) {
+      if (!node.visible) continue;
+      this.scratch.set(node.position.x, node.position.y, node.position.z).project(this.camera);
+      const distance = Math.hypot(this.scratch.x - x, this.scratch.y - y);
+      if (distance < bestD) {
+        bestD = distance;
+        best = { id, point: [node.position.x, node.position.y, node.position.z], distance };
+      }
+    }
+    return best;
   }
 
   raycast(origin: Vec3, direction: Vec3): RayHit | null {
@@ -576,6 +607,7 @@ export class SceneEngine {
     this.simulate(view.moves.map((move) => move.id));
     this.applySelection(view.selectedId);
     this.paintHover(view.hoveredId);
+    this.paintHeld(view.heldId);
     this.mountVideo(view.videoCanvas, view.showVideo, view.videoRevision);
     this.placeSky(view.panorama);
     if (view.stayHere) {
@@ -1014,6 +1046,23 @@ export class SceneEngine {
     this.ring.position.set(node.position.x, 0.006, node.position.z);
     const span = Math.max(node.scale.x, node.scale.z, 0.15);
     this.ring.scale.setScalar(Math.max(0.7, span / 0.16));
+  }
+
+  private paintHeld(id: string | null): void {
+    if (this.heldId !== id) {
+      if (this.heldId && this.heldId !== this.hoverId) this.setEmissive(this.heldId, 0x000000);
+      this.heldId = id;
+    }
+    const node = id ? this.nodes.get(id) : undefined;
+    if (!node?.visible) {
+      this.holdRing.visible = false;
+      return;
+    }
+    this.setEmissive(id, 0x5a3e1c);
+    this.holdRing.visible = true;
+    this.holdRing.position.set(node.position.x, node.position.y + 0.015, node.position.z);
+    const span = Math.max(node.scale.x, node.scale.z, 0.12);
+    this.holdRing.scale.setScalar(span / 0.11);
   }
 
   private paintHover(id: string | null): void {
