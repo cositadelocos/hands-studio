@@ -4,11 +4,7 @@ import type { InteractionSpace, SceneObject, Side, StudioHand } from "@/studio/t
 
 export interface Hold {
   id: string;
-  offsetX: number;
-  offsetZ: number;
-  baseY: number;
-  imageY: number;
-  span: number;
+  offset: Vec3;
   last: Vec3;
   miss: number;
 }
@@ -44,12 +40,6 @@ export function objectRadius(object: SceneObject): number {
   return 0.55 * scale;
 }
 
-function pinchImageY(hand: StudioHand): number {
-  const thumb = hand.image[4];
-  const index = hand.image[8];
-  if (!thumb || !index) return 0.5;
-  return (thumb.y + index.y) * 0.5;
-}
 function seenId(
   hit: RayHit | null,
   taken: (id: string) => boolean,
@@ -81,8 +71,8 @@ function nearestPlanar(
 }
 
 /**
- * Pinch grabs whatever sits under the hand in the view, front or back.
- * While held, moving toward the lens pulls the object forward; moving away pushes it back.
+ * The grabbed object stays glued to the pinch, in camera space,
+ * so turning the view carries it with the hand.
  */
 export function stepInteraction(
   memory: InteractionMemory,
@@ -92,6 +82,8 @@ export function stepInteraction(
   pickThrough: (point: Vec3) => RayHit | null,
   space: InteractionSpace,
   allowManipulate: boolean,
+  toLocal: (point: Vec3) => Vec3,
+  toWorld: (point: Vec3) => Vec3,
 ): InteractionResult {
   const holds: Partial<Record<Side, Hold>> = { ...memory.holds };
   const moves: { id: string; position: Vec3 }[] = [];
@@ -125,11 +117,12 @@ export function stepInteraction(
       continue;
     }
     hold.miss = 0;
-    const position: Vec3 = [
-      hand.pinchPoint[0] + hold.offsetX,
-      hold.baseY + (hold.imageY - pinchImageY(hand)) * 1.7,
-      hand.pinchPoint[2] + hold.offsetZ,
-    ];
+    const pinch = toLocal(hand.pinchPoint);
+    const position = toWorld([
+      pinch[0] + hold.offset[0],
+      pinch[1] + hold.offset[1],
+      pinch[2] + hold.offset[2],
+    ]);
     hold.last = position;
     moves.push({ id: hold.id, position });
   }
@@ -157,13 +150,11 @@ export function stepInteraction(
     if (!target) continue;
     const object = objects.find((item) => item.id === target);
     if (!object) continue;
+    const pinch = toLocal(hand.pinchPoint);
+    const objectLocal = toLocal(object.position);
     holds[side] = {
       id: target,
-      offsetX: object.position[0] - hand.pinchPoint[0],
-      offsetZ: object.position[2] - hand.pinchPoint[2],
-      baseY: object.position[1],
-      imageY: pinchImageY(hand),
-      span: hand.span,
+      offset: [objectLocal[0] - pinch[0], objectLocal[1] - pinch[1], objectLocal[2] - pinch[2]],
       last: [object.position[0], object.position[1], object.position[2]],
       miss: 0,
     };

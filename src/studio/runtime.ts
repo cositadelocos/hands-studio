@@ -382,6 +382,8 @@ export function startRuntime(
       (point) => engine.pickThrough(point),
       studio.space,
       mode === "camera" || studio.demoDrive,
+      (point) => engine.toLocal(point),
+      (point) => engine.toWorld(point),
     );
 
     for (const side of ["left", "right"] as const) {
