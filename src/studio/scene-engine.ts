@@ -215,7 +215,7 @@ export class SceneEngine {
     );
 
     this.landmarks = new InstancedMesh(
-      new SphereGeometry(0.008, 6, 4),
+      new SphereGeometry(0.008, 4, 3),
       new MeshLambertMaterial({ color: 0xffffff }),
       42,
     );
@@ -598,10 +598,9 @@ export class SceneEngine {
       }
       previous.copy(node.position);
     }
-    this.keepOnTable();
-
     const moving = ids.some((id) => !held.has(id) && !this.sleeping.has(id) && this.nodes.get(id)?.visible);
     if (!moving && held.size === 0) return;
+    this.keepOnTable();
 
     const resting = new Set<string>();
     for (let pass = 0; pass < 3; pass += 1) {
