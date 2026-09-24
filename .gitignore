@@ -1,0 +1,16 @@
+node_modules
+.vercel
+dist
+.output
+.env
+.env.*
+!.env.example
+screenshots
+artifacts
+.grok
+AGENTS.md
+*.log
+.DS_Store
+coverage
+.pglite
+*.tsbuildinfo
