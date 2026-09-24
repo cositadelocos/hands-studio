@@ -71,11 +71,22 @@ export function startRuntime(
   let lastCycle = -1;
   let snapshotNext = false;
   let draining = false;
+  let overlayRevision = -1;
   let stopQueued = false;
   const held: Partial<Record<Side, string>> = {};
 
   engine.onSelect = (id) => useStudio.getState().select(id);
   engine.onTransform = (id, transform) => useStudio.getState().commitTransform(id, transform);
+  engine.onRest = (id, position) => {
+    const object = useStudio.getState().objects.find((item) => item.id === id);
+    if (!object) return;
+    const same =
+      Math.abs(object.position[0] - position[0]) < 1e-4 &&
+      Math.abs(object.position[1] - position[1]) < 1e-4 &&
+      Math.abs(object.position[2] - position[2]) < 1e-4;
+    if (same) return;
+    useStudio.getState().commitTransform(id, { position, rotation: object.rotation, scale: object.scale });
+  };
 
   const resize = () => {
     const parent = canvas.parentElement;
@@ -207,10 +218,14 @@ export function startRuntime(
       invertHands: studio.invertHands,
     });
     const previous = { left: held.left, right: held.right };
+    const liveObjects = studio.objects.map((object) => {
+      const pose = engine.readTransform(object.id);
+      return pose ? { ...object, position: pose.position } : object;
+    });
     const result = stepInteraction(
       interaction,
       tracked.hands,
-      useStudio.getState().objects,
+      liveObjects,
       (origin, direction) => engine.raycast(origin, direction),
       (point) => engine.pickThrough(point),
       studio.space,
@@ -248,7 +263,8 @@ export function startRuntime(
       }),
     );
 
-    if (fresh.showOverlay) {
+    if (fresh.showOverlay && (mode !== "camera" || mediapipe.revision !== overlayRevision)) {
+      overlayRevision = mediapipe.revision;
       const context = overlay.getContext("2d");
       if (context) {
         drawOverlay(context, mode === "camera" ? mediapipe.display : null, tracked.hands, mode === "camera" && fresh.showVideo, fresh.debug);

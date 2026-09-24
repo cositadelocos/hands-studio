@@ -20,7 +20,7 @@ export type FacingMode = "user" | "environment";
 
 /**
  * Camera → Hand Landmarker. Emits RawHand only.
- * Front camera is drawn unmirrored. Handedness is swapped to match the person.
+ * The front camera is flipped once so the picture is not a mirror.
  */
 export class MediaPipeSource {
   readonly display: HTMLCanvasElement;
@@ -37,7 +37,7 @@ export class MediaPipeSource {
 
   constructor(private readonly video: HTMLVideoElement) {
     this.display = document.createElement("canvas");
-    const ctx = this.display.getContext("2d", { willReadFrequently: true });
+    const ctx = this.display.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("No se pudo preparar el lienzo de la cámara.");
     this.ctx = ctx;
   }
@@ -89,8 +89,8 @@ export class MediaPipeSource {
     const width = this.video.videoWidth;
     const height = this.video.videoHeight;
     if (!width || !height) return this.last;
-    if (this.last && now - this.lastDetectAt < 32) return this.last;
-    const maxWidth = 640;
+    if (this.last && now - this.lastDetectAt < 42) return this.last;
+    const maxWidth = 480;
     const scale = width > maxWidth ? maxWidth / width : 1;
     const drawWidth = Math.max(2, Math.round(width * scale));
     const drawHeight = Math.max(2, Math.round(height * scale));
@@ -98,7 +98,7 @@ export class MediaPipeSource {
       this.display.width = drawWidth;
       this.display.height = drawHeight;
     }
-    const mirror = this.facing !== "user";
+    const mirror = this.facing === "user";
     this.ctx.setTransform(mirror ? -1 : 1, 0, 0, 1, mirror ? drawWidth : 0, 0);
     this.ctx.drawImage(this.video, 0, 0, drawWidth, drawHeight);
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);

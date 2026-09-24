@@ -19,7 +19,6 @@ import {
   Mesh,
   MeshStandardMaterial,
   Object3D,
-  PCFShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
   Raycaster,
@@ -146,6 +145,17 @@ export class SceneEngine {
   private pointerDown: { x: number; y: number; gizmo: boolean } | null = null;
   onSelect: ((id: string | null) => void) | null = null;
   onTransform: ((id: string, transform: TransformSnapshot) => void) | null = null;
+  onRest: ((id: string, position: Vec3) => void) | null = null;
+  private readonly velocities = new Map<string, Vector3>();
+  private readonly previous = new Map<string, Vector3>();
+  private readonly sleeping = new Set<string>();
+  private physicsStamp = 0;
+  private readonly boxA = new Box3();
+  private readonly boxB = new Box3();
+  private readonly sizeA = new Vector3();
+  private readonly sizeB = new Vector3();
+  private readonly centerA = new Vector3();
+  private readonly centerB = new Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.root = new Group();
@@ -161,8 +171,7 @@ export class SceneEngine {
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.toneMapping = ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = PCFShadowMap;
+    this.renderer.shadowMap.enabled = false;
 
     this.camera = new PerspectiveCamera(38, 1, 0.05, 30);
     this.camera.position.set(0.22, 0.58, 1.38);
@@ -170,15 +179,7 @@ export class SceneEngine {
     const hemi = new HemisphereLight(0xd5e4ee, 0x1a140f, 0.85);
     const key = new DirectionalLight(0xfff3e4, 2.5);
     key.position.set(0.9, 2.4, 1.5);
-    key.castShadow = true;
-    key.shadow.mapSize.set(512, 512);
-    key.shadow.camera.near = 0.2;
-    key.shadow.camera.far = 6;
-    key.shadow.camera.left = -1.2;
-    key.shadow.camera.right = 1.2;
-    key.shadow.camera.top = 1.2;
-    key.shadow.camera.bottom = -1.2;
-    key.shadow.bias = -0.0008;
+    key.castShadow = false;
     const fill = new DirectionalLight(0x9fd8d4, 0.55);
     fill.position.set(-1.4, 1.1, 0.6);
     const rim = new DirectionalLight(0xe59a4a, 0.35);
@@ -305,7 +306,7 @@ export class SceneEngine {
     if (width < 2 || height < 2) return;
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1));
     this.renderer.setSize(width, height, false);
   }
 
@@ -396,6 +397,7 @@ export class SceneEngine {
       if (!node || (this.gizmoDragging && this.selectedId === move.id)) continue;
       node.position.set(move.position[0], move.position[1], move.position[2]);
     }
+    this.simulate(view.moves.map((move) => move.id));
     this.applySelection(view.selectedId);
     this.paintHover(view.hoveredId);
     this.mountVideo(view.videoCanvas, view.showVideo, view.videoRevision);
@@ -412,6 +414,162 @@ export class SceneEngine {
     this.videoTexture?.dispose();
     for (const node of this.nodes.values()) this.disposeNode(node);
     this.renderer.dispose();
+  }
+
+  private velocityOf(id: string): Vector3 {
+    let velocity = this.velocities.get(id);
+    if (!velocity) {
+      velocity = new Vector3();
+      this.velocities.set(id, velocity);
+    }
+    return velocity;
+  }
+
+  private remember(id: string, node: Object3D): Vector3 {
+    let previous = this.previous.get(id);
+    if (!previous) {
+      previous = node.position.clone();
+      this.previous.set(id, previous);
+      this.boxA.setFromObject(node);
+      if (this.boxA.min.y <= 0.02) this.sleeping.add(id);
+    }
+    return previous;
+  }
+
+  /** Gravity, floor, and solid-vs-solid collisions. Held pieces are kinematic. */
+  private simulate(heldIds: string[]): void {
+    const now = performance.now();
+    const dt = Math.min(0.033, this.physicsStamp ? (now - this.physicsStamp) / 1000 : 0.016);
+    this.physicsStamp = now;
+    const held = new Set(heldIds);
+    if (this.gizmoDragging && this.selectedId) held.add(this.selectedId);
+    const ids = [...this.nodes.keys()];
+
+    for (const id of ids) {
+      const node = this.nodes.get(id);
+      if (!node?.visible) continue;
+      const velocity = this.velocityOf(id);
+      const previous = this.remember(id, node);
+      if (held.has(id)) {
+        velocity.set(node.position.x - previous.x, node.position.y - previous.y, node.position.z - previous.z);
+        velocity.multiplyScalar(1 / Math.max(dt, 1 / 120));
+        if (velocity.length() > 3.2) velocity.setLength(3.2);
+        this.sleeping.delete(id);
+      } else if (!this.sleeping.has(id)) {
+        velocity.y -= 12 * dt;
+        node.position.addScaledVector(velocity, dt);
+      }
+      previous.copy(node.position);
+    }
+
+    const moving = ids.some((id) => !held.has(id) && !this.sleeping.has(id) && this.nodes.get(id)?.visible);
+    if (!moving && held.size === 0) return;
+
+    const resting = new Set<string>();
+    for (let pass = 0; pass < 3; pass += 1) {
+      for (const id of ids) {
+        const node = this.nodes.get(id);
+        if (!node?.visible || held.has(id) || this.sleeping.has(id)) continue;
+        this.boxA.setFromObject(node);
+        if (this.boxA.min.y < 0) {
+          node.position.y -= this.boxA.min.y;
+          const velocity = this.velocityOf(id);
+          velocity.y = velocity.y < -0.45 ? -velocity.y * 0.12 : 0;
+          velocity.x *= 0.86;
+          velocity.z *= 0.86;
+          resting.add(id);
+        }
+      }
+      for (let i = 0; i < ids.length; i += 1) {
+        for (let j = i + 1; j < ids.length; j += 1) {
+          this.collide(ids[i]!, ids[j]!, held, resting);
+        }
+      }
+    }
+
+    for (const id of ids) {
+      if (held.has(id) || this.sleeping.has(id)) continue;
+      const node = this.nodes.get(id);
+      if (!node?.visible) continue;
+      const velocity = this.velocityOf(id);
+      this.boxA.setFromObject(node);
+      const supported = this.boxA.min.y <= 0.012 || resting.has(id);
+      if (supported && velocity.length() < 0.06) {
+        velocity.set(0, 0, 0);
+        this.sleeping.add(id);
+        this.onRest?.(id, [node.position.x, node.position.y, node.position.z]);
+      }
+    }
+  }
+
+  private collide(aId: string, bId: string, held: Set<string>, resting: Set<string>): void {
+    const a = this.nodes.get(aId);
+    const b = this.nodes.get(bId);
+    if (!a?.visible || !b?.visible) return;
+    if ((held.has(aId) || this.sleeping.has(aId)) && (held.has(bId) || this.sleeping.has(bId))) return;
+    this.boxA.setFromObject(a);
+    this.boxB.setFromObject(b);
+    if (!this.boxA.intersectsBox(this.boxB)) return;
+    this.boxA.getSize(this.sizeA);
+    this.boxB.getSize(this.sizeB);
+    this.boxA.getCenter(this.centerA);
+    this.boxB.getCenter(this.centerB);
+    const dx = this.centerB.x - this.centerA.x;
+    const dy = this.centerB.y - this.centerA.y;
+    const dz = this.centerB.z - this.centerA.z;
+    const px = (this.sizeA.x + this.sizeB.x) * 0.5 - Math.abs(dx);
+    const py = (this.sizeA.y + this.sizeB.y) * 0.5 - Math.abs(dy);
+    const pz = (this.sizeA.z + this.sizeB.z) * 0.5 - Math.abs(dz);
+    if (px <= 0 || py <= 0 || pz <= 0) return;
+    const axis = px < py && px < pz ? 0 : py < pz ? 1 : 2;
+    const delta = axis === 0 ? dx : axis === 1 ? dy : dz;
+    const sign = delta < 0 ? -1 : 1;
+    const pen = axis === 0 ? px : axis === 1 ? py : pz;
+    const aHeld = held.has(aId);
+    const bHeld = held.has(bId);
+    const shift = (node: Object3D, amount: number) => {
+      if (axis === 0) node.position.x += amount;
+      else if (axis === 1) node.position.y += amount;
+      else node.position.z += amount;
+    };
+    if (!aHeld && !bHeld) {
+      shift(a, -sign * pen * 0.5);
+      shift(b, sign * pen * 0.5);
+      this.sleeping.delete(aId);
+      this.sleeping.delete(bId);
+    } else if (!aHeld) {
+      shift(a, -sign * pen);
+      this.sleeping.delete(aId);
+      this.shove(aId, bId, axis);
+    } else if (!bHeld) {
+      shift(b, sign * pen);
+      this.sleeping.delete(bId);
+      this.shove(bId, aId, axis);
+    }
+    if (axis === 1) {
+      const upperId = dy >= 0 ? bId : aId;
+      const upperVel = this.velocityOf(upperId);
+      if (!held.has(upperId) && upperVel.y < 0) upperVel.y = upperVel.y < -0.4 ? -upperVel.y * 0.1 : 0;
+      resting.add(upperId);
+      return;
+    }
+    const aVel = this.velocityOf(aId);
+    const bVel = this.velocityOf(bId);
+    if (!aHeld) {
+      if (axis === 0) aVel.x *= -0.2;
+      else aVel.z *= -0.2;
+    }
+    if (!bHeld) {
+      if (axis === 0) bVel.x *= -0.2;
+      else bVel.z *= -0.2;
+    }
+  }
+
+  private shove(targetId: string, sourceId: string, axis: number): void {
+    const source = this.velocityOf(sourceId);
+    const target = this.velocityOf(targetId);
+    if (axis === 0) target.x = source.x;
+    else if (axis === 2) target.z = source.z;
   }
 
   private emitTransform(): void {
@@ -453,6 +611,9 @@ export class SceneEngine {
       this.world.remove(node);
       this.disposeNode(node);
       this.nodes.delete(id);
+      this.velocities.delete(id);
+      this.previous.delete(id);
+      this.sleeping.delete(id);
       if (this.selectedId === id) this.controls.detach();
     }
     for (const object of objects) {
@@ -465,7 +626,16 @@ export class SceneEngine {
       }
       const skip = this.gizmoDragging && this.selectedId === object.id;
       if (!skip) {
-        node.position.set(object.position[0], object.position[1], object.position[2]);
+        const jumped =
+          (node.position.x - object.position[0]) ** 2 +
+          (node.position.y - object.position[1]) ** 2 +
+          (node.position.z - object.position[2]) ** 2;
+        if (jumped > 1e-6) {
+          node.position.set(object.position[0], object.position[1], object.position[2]);
+          this.velocityOf(object.id).set(0, 0, 0);
+          this.previous.get(object.id)?.copy(node.position);
+          this.sleeping.add(object.id);
+        }
         node.rotation.set(object.rotation[0], object.rotation[1], object.rotation[2]);
         node.scale.set(object.scale[0], object.scale[1], object.scale[2]);
       }
