@@ -232,18 +232,18 @@ export function LeftPanel() {
           </button>
         </Section>
 
-        <Section title="IMAGEN 360">
+        <Section title="ENTORNO 360">
           <button
             type="button"
             className="min-h-11 w-full rounded-md border border-border bg-surface-2 text-sm text-fg"
             onClick={() => panoramaRef.current?.click()}
           >
-            Cargar imagen 360
+            Cargar GLB 360
           </button>
           <input
             ref={panoramaRef}
             type="file"
-            accept="image/*"
+            accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -256,8 +256,8 @@ export function LeftPanel() {
               <p className="mt-2 truncate text-sm text-muted">{studio.panorama.name}</p>
               <Slider
                 label="Posición X"
-                min={-2}
-                max={2}
+                min={-3}
+                max={3}
                 step={0.01}
                 value={studio.panorama.position[0]}
                 display={studio.panorama.position[0].toFixed(3)}
@@ -265,8 +265,8 @@ export function LeftPanel() {
               />
               <Slider
                 label="Posición Y"
-                min={-1}
-                max={2}
+                min={-2}
+                max={3}
                 step={0.01}
                 value={studio.panorama.position[1]}
                 display={studio.panorama.position[1].toFixed(3)}
@@ -274,8 +274,8 @@ export function LeftPanel() {
               />
               <Slider
                 label="Posición Z"
-                min={-2}
-                max={2}
+                min={-3}
+                max={3}
                 step={0.01}
                 value={studio.panorama.position[2]}
                 display={studio.panorama.position[2].toFixed(3)}
@@ -283,8 +283,8 @@ export function LeftPanel() {
               />
               <Slider
                 label="Escala"
-                min={1.5}
-                max={16}
+                min={0.05}
+                max={4}
                 step={0.01}
                 value={studio.panorama.scale}
                 display={studio.panorama.scale.toFixed(2)}
@@ -304,11 +304,11 @@ export function LeftPanel() {
                 className="mt-3 min-h-11 w-full rounded-md border border-border text-sm text-muted"
                 onClick={() => pushCommand({ type: "panorama-clear" })}
               >
-                Quitar imagen
+                Quitar entorno
               </button>
             </>
           ) : (
-            <p className="mt-2 text-sm text-muted">Al cargarla quedas dentro, en el centro de la imagen.</p>
+            <p className="mt-2 text-sm text-muted">Sube el GLB y quedas dentro, en el centro del modelo.</p>
           )}
         </Section>
 

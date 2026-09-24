@@ -1,6 +1,5 @@
 import {
   AxesHelper,
-  BackSide,
   Box3,
   BoxGeometry,
   BufferAttribute,
@@ -17,7 +16,6 @@ import {
   LineBasicMaterial,
   LineSegments,
   Mesh,
-  MeshBasicMaterial,
   MeshLambertMaterial,
   Object3D,
   PerspectiveCamera,
@@ -108,22 +106,6 @@ function writeSegment(line: LineSegments, a: Vec3, b: Vec3): void {
   attribute.needsUpdate = true;
 }
 
-async function downscaleImage(file: File, maxEdge: number): Promise<HTMLCanvasElement> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(2, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(2, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d", { alpha: false });
-  if (!context) {
-    bitmap.close();
-    throw new Error("No se pudo preparar la imagen 360.");
-  }
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return canvas;
-}
-
 export class SceneEngine {
   readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
@@ -152,8 +134,9 @@ export class SceneEngine {
   private readonly wall: Mesh;
   private readonly grid: GridHelper;
   private readonly ring: Mesh;
-  private readonly sky: Mesh;
-  private skyTexture: CanvasTexture | null = null;
+  private readonly room = new Group();
+  private roomModel: Group | null = null;
+  private roomFit = 1;
   private stayHere = true;
   private yaw = 0;
   private pitch = -0.32;
@@ -249,14 +232,7 @@ export class SceneEngine {
     );
     this.ring.rotation.x = Math.PI / 2;
     this.ring.visible = false;
-
-    this.sky = new Mesh(
-      new SphereGeometry(1, 32, 18),
-      new MeshBasicMaterial({ color: 0x141b21, side: BackSide }),
-    );
-    this.sky.frustumCulled = false;
-    this.sky.visible = false;
-    this.scene.add(this.sky);
+    this.scene.add(this.room);
 
     this.world.add(
       hemi,
@@ -408,22 +384,36 @@ export class SceneEngine {
   }
 
   async loadPanorama(file: File): Promise<void> {
-    const canvas = await downscaleImage(file, 1536);
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = SRGBColorSpace;
-    texture.needsUpdate = true;
-    this.skyTexture?.dispose();
-    this.skyTexture = texture;
+    const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+    const loader = new GLTFLoader();
+    const url = URL.createObjectURL(file);
+    try {
+      const gltf = await loader.loadAsync(url);
+      this.clearRoomModel();
+      const model = gltf.scene;
+      model.traverse((child) => {
+        if (child instanceof Mesh) {
+          child.castShadow = false;
+          child.receiveShadow = false;
+        }
+      });
+      model.updateMatrixWorld(true);
+      const bounds = new Box3().setFromObject(model);
+      const center = bounds.getCenter(new Vector3());
+      const size = bounds.getSize(new Vector3());
+      model.position.sub(center);
+      const longest = Math.max(size.x, size.y, size.z, 1e-4);
+      this.roomFit = 5 / longest;
+      this.room.add(model);
+      this.roomModel = model;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   }
 
   clearPanorama(): void {
-    this.skyTexture?.dispose();
-    this.skyTexture = null;
-    const material = this.sky.material as MeshBasicMaterial;
-    material.map = null;
-    material.color.setHex(0x141b21);
-    material.needsUpdate = true;
-    this.sky.visible = false;
+    this.clearRoomModel();
+    this.room.visible = false;
     this.wall.visible = true;
   }
 
@@ -468,7 +458,7 @@ export class SceneEngine {
     this.controls.dispose();
     this.orbit.dispose();
     this.videoTexture?.dispose();
-    this.skyTexture?.dispose();
+    this.clearRoomModel();
     for (const node of this.nodes.values()) this.disposeNode(node);
     this.renderer.dispose();
   }
@@ -484,19 +474,30 @@ export class SceneEngine {
   }
 
   private placeSky(panorama: PanoramaSettings | null): void {
-    const show = Boolean(panorama && this.skyTexture);
-    this.sky.visible = show;
+    const show = Boolean(panorama && this.roomModel);
+    this.room.visible = show;
     this.wall.visible = !show;
     if (!panorama || !show) return;
-    this.sky.position.set(panorama.position[0], panorama.position[1], panorama.position[2]);
-    this.sky.scale.setScalar(Math.max(1.2, panorama.scale));
-    this.sky.rotation.y = (panorama.rotation * Math.PI) / 180;
-    const material = this.sky.material as MeshBasicMaterial;
-    if (material.map !== this.skyTexture) {
-      material.map = this.skyTexture;
-      material.color.setHex(0xffffff);
-      material.needsUpdate = true;
-    }
+    this.room.position.set(panorama.position[0], panorama.position[1], panorama.position[2]);
+    this.room.scale.setScalar(Math.max(0.01, panorama.scale) * this.roomFit);
+    this.room.rotation.y = (panorama.rotation * Math.PI) / 180;
+  }
+
+  private clearRoomModel(): void {
+    if (!this.roomModel) return;
+    this.room.remove(this.roomModel);
+    this.roomModel.traverse((child) => {
+      if (!(child instanceof Mesh)) return;
+      child.geometry.dispose();
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) {
+        const map = (material as { map?: { dispose: () => void } }).map;
+        map?.dispose();
+        material.dispose();
+      }
+    });
+    this.roomModel = null;
+    this.roomFit = 1;
   }
 
   private velocityOf(id: string): Vector3 {

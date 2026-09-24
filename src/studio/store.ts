@@ -67,7 +67,7 @@ function defaultObjects(): SceneObject[] {
       id: "cube-demo",
       name: "Cubo",
       kind: "box",
-      position: [-0.18, 0.06, 0.02],
+      position: [-0.7, 0.06, 0.55],
       rotation: [0, 0.4, 0],
       scale: [0.12, 0.12, 0.12],
       visible: true,
@@ -79,7 +79,7 @@ function defaultObjects(): SceneObject[] {
       id: "sphere-demo",
       name: "Esfera",
       kind: "sphere",
-      position: [0.22, 0.07, -0.04],
+      position: [0.75, 0.07, 0.35],
       rotation: [0, 0, 0],
       scale: [0.14, 0.14, 0.14],
       visible: true,
@@ -91,7 +91,7 @@ function defaultObjects(): SceneObject[] {
       id: "torus-demo",
       name: "Toro",
       kind: "torus",
-      position: [0.02, 0.045, 0.14],
+      position: [0.05, 0.05, 0.9],
       rotation: [Math.PI / 2, 0, 0.25],
       scale: [0.2, 0.2, 0.2],
       visible: true,
@@ -116,6 +116,21 @@ function loadPersisted(): Partial<Persisted> | null {
 }
 
 const saved = loadPersisted();
+
+function spreadObjects(objects: SceneObject[]): SceneObject[] {
+  const parked: Record<string, Vec3> = {
+    "cube-demo": [-0.7, 0.06, 0.55],
+    "sphere-demo": [0.75, 0.07, 0.35],
+    "torus-demo": [0.05, 0.05, 0.9],
+  };
+  return objects.map((object) => {
+    const next = parked[object.id];
+    if (!next) return object;
+    const [x, , z] = object.position;
+    if (x * x + z * z > 0.36) return object;
+    return { ...object, position: next };
+  });
+}
 
 function savedSpace(): InteractionSpace {
   const space = saved?.space;
@@ -194,7 +209,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   demoDrive: saved?.demoDrive ?? true,
   stayHere: true,
   panorama: null,
-  objects: saved?.objects?.length ? saved.objects : defaultObjects(),
+  objects: saved?.objects?.length ? spreadObjects(saved.objects) : defaultObjects(),
   selectedId: null,
   setSpace: (patch) => set((state) => ({ space: { ...state.space, ...patch } })),
   patch: (patch) => set(patch),
@@ -217,7 +232,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         id: `${kind}-${crypto.randomUUID().slice(0, 6)}`,
         name: kind === "box" ? "Cubo" : kind === "sphere" ? "Esfera" : kind === "torus" ? "Toro" : "Cilindro",
         kind,
-        position: [((index % 5) - 2) * 0.16, y, 0.04],
+        position: [((index % 5) - 2) * 0.32, y, 0.6],
         rotation: kind === "torus" ? [Math.PI / 2, 0, 0] : [0, 0, 0],
         scale: [scale, scale, scale],
         visible: true,
@@ -241,7 +256,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     set((state) => ({
       objects: state.objects.map((object) =>
         object.id === "cube-demo"
-          ? { ...object, position: [-0.18, 0.06, 0.02], rotation: [0, 0.4, 0], scale: [0.12, 0.12, 0.12] }
+          ? { ...object, position: [-0.7, 0.06, 0.55], rotation: [0, 0.4, 0], scale: [0.12, 0.12, 0.12] }
           : object,
       ),
     })),
