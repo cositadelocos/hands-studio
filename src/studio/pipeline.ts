@@ -9,6 +9,7 @@ import type { Anchor, Side, StudioHand, TrackSettings, TrackingFrame } from "@/s
 export interface SmoothMemory {
   points: Partial<Record<Side, Vec3[]>>;
   span: Partial<Record<Side, number>>;
+  pinch: Partial<Record<Side, boolean>>;
   lost: Record<Side, number>;
 }
 
@@ -20,7 +21,7 @@ export interface PipelineMemory {
 export function createPipelineMemory(): PipelineMemory {
   return {
     wrists: createWristMemory(),
-    smooth: { points: {}, span: {}, lost: { left: 0, right: 0 } },
+    smooth: { points: {}, span: {}, pinch: {}, lost: { left: 0, right: 0 } },
   };
 }
 
@@ -48,6 +49,7 @@ export function advanceTracking(
       if (memory.smooth.lost[side] > 6) {
         delete memory.smooth.points[side];
         delete memory.smooth.span[side];
+        delete memory.smooth.pinch[side];
       }
       continue;
     }
@@ -60,7 +62,15 @@ export function advanceTracking(
     const points = smoothPoints(memory.smooth.points[side], mapped, alpha);
     memory.smooth.points[side] = points;
     memory.smooth.lost[side] = 0;
-    const gesture = readGestures(points, { pinchThreshold: settings.pinchThreshold });
+    const thumb = raw.image[4];
+    const index = raw.image[8];
+    const imagePinch = thumb && index ? Math.hypot(thumb.x - index.x, thumb.y - index.y) : 1;
+    const gesture = readGestures(points, {
+      pinchThreshold: settings.pinchThreshold,
+      imagePinch,
+      wasPinch: memory.smooth.pinch[side],
+    });
+    memory.smooth.pinch[side] = gesture.pinch;
     hands[side] = {
       side,
       confidence: raw.score,

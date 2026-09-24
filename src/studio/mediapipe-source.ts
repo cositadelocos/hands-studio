@@ -34,7 +34,7 @@ export class MediaPipeSource {
   invertHands = false;
   revision = 0;
   private lastDetectAt = -1;
-  private detectGap = 160;
+  private detectGap = 90;
 
   constructor(private readonly video: HTMLVideoElement) {
     this.display = document.createElement("canvas");
@@ -51,7 +51,7 @@ export class MediaPipeSource {
     }
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: facing, width: { ideal: 160 }, height: { ideal: 120 }, frameRate: { ideal: 12, max: 15 } },
+      video: { facingMode: facing, width: { ideal: 224 }, height: { ideal: 168 }, frameRate: { ideal: 15, max: 20 } },
     });
     this.stream = stream;
     this.video.srcObject = stream;
@@ -91,7 +91,7 @@ export class MediaPipeSource {
     const height = this.video.videoHeight;
     if (!width || !height) return this.last;
     if (this.last && now - this.lastDetectAt < this.detectGap) return this.last;
-    const maxWidth = 160;
+    const maxWidth = 192;
     const scale = width > maxWidth ? maxWidth / width : 1;
     const drawWidth = Math.max(2, Math.round(width * scale));
     const drawHeight = Math.max(2, Math.round(height * scale));
@@ -137,7 +137,7 @@ export class MediaPipeSource {
       }
     });
     const elapsed = performance.now() - started;
-    this.detectGap = elapsed > 36 ? 280 : elapsed > 18 ? 180 : 120;
+    this.detectGap = elapsed > 32 ? 160 : elapsed > 18 ? 110 : 70;
     this.revision += 1;
     this.last = { timestamp, latencyMs: performance.now() - started, source: "mediapipe", hands };
     return this.last;

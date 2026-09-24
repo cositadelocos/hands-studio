@@ -118,7 +118,7 @@ function writeSegment(line: LineSegments, a: Vec3, b: Vec3): void {
 async function skyTexture(file: File): Promise<Texture> {
   const bitmap = await createImageBitmap(file);
   const longest = Math.max(bitmap.width, bitmap.height);
-  const maxEdge = 4096;
+  const maxEdge = 2048;
   const source =
     longest <= maxEdge
       ? bitmap
@@ -129,6 +129,7 @@ async function skyTexture(file: File): Promise<Texture> {
         });
   if (source !== bitmap) bitmap.close();
   const texture = new Texture(source);
+  texture.flipY = false;
   texture.colorSpace = SRGBColorSpace;
   texture.minFilter = LinearMipmapLinearFilter;
   texture.magFilter = LinearFilter;

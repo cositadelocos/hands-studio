@@ -3,6 +3,8 @@ import type { Vec3 } from "@/studio/math";
 
 export interface GestureParams {
   pinchThreshold: number;
+  imagePinch?: number;
+  wasPinch?: boolean;
 }
 
 export interface GestureReading {
@@ -29,7 +31,10 @@ export function readGestures(points: Vec3[], params: GestureParams): GestureRead
   const thumb = points[4] ?? points[0] ?? [0, 0, 0];
   const indexTip = points[8] ?? points[0] ?? [0, 0, 0];
   const pinchDistance = vdist(thumb, indexTip);
-  const pinch = pinchDistance < params.pinchThreshold;
+  const imagePinch = params.imagePinch ?? 1;
+  const close = pinchDistance < params.pinchThreshold || imagePinch < 0.06;
+  const still = pinchDistance < params.pinchThreshold * 1.55 || imagePinch < 0.09;
+  const pinch = params.wasPinch ? still : close;
   const pinchPoint: Vec3 = [
     (thumb[0] + indexTip[0]) * 0.5,
     (thumb[1] + indexTip[1]) * 0.5,
@@ -41,7 +46,7 @@ export function readGestures(points: Vec3[], params: GestureParams): GestureRead
   const ringExt = extension(points, 16, 13);
   const pinkyExt = extension(points, 20, 17);
   const curled = [middleExt, ringExt, pinkyExt].filter((v) => v < 1.12).length;
-  const pointing = !pinch && indexExt > 1.22 && curled >= 2;
+  const pointing = !pinch && indexExt > 1.12 && curled >= 2;
 
   const pip = points[6] ?? indexTip;
   let dir = vsub(indexTip, pip);

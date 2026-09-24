@@ -106,7 +106,7 @@ export function stepInteraction(
       position: [
         hand.pinchPoint[0] + hold.offsetX,
         hand.pinchPoint[1] + hold.offsetY,
-        clamp(hold.z + (hand.span - hold.span) * (space.depth / 0.06), space.offsetZ - space.depth * 0.5, space.offsetZ + space.depth * 0.5),
+        clamp(hold.z + (hand.span - hold.span) * 1.6, hold.z - 0.55, hold.z + 0.55),
       ],
     });
   }
@@ -125,7 +125,7 @@ export function stepInteraction(
       hoveredId = aimed.id;
       hoveredBy = side;
     }
-    if (holds[side] || !hand.pinch || !allowManipulate || hand.confidence < 0.35) continue;
+    if (holds[side] || !hand.pinch || !allowManipulate || hand.confidence < 0.2) continue;
 
     let target = seenId(aimed, taken, objects);
     if (!target && hit) target = seenId(hit, taken, objects);
