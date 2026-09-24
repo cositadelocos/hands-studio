@@ -13,7 +13,7 @@ import { STUDIO_EYE } from "@/studio/types";
 
 const DEMO_CUBE: Vec3 = [-0.35, 0.8, -0.95];
 
-import { KEY_ANCHOR_IDS, palmRotation } from "@/studio/anchors";
+import { KEY_ANCHOR_IDS, buildAnchors, palmRotation } from "@/studio/anchors";
 
 function stampName(): string {
   const now = new Date();
@@ -54,6 +54,25 @@ function viewFrom(studio: StudioState, extra: Partial<FrameView> = {}): FrameVie
     panorama: studio.panorama,
     ...extra,
   };
+}
+
+function carryHands(
+  hands: Partial<Record<Side, StudioHand>>,
+  engine: SceneEngine,
+): Partial<Record<Side, StudioHand>> {
+  const placed: Partial<Record<Side, StudioHand>> = {};
+  for (const side of ["left", "right"] as const) {
+    const hand = hands[side];
+    if (!hand) continue;
+    placed[side] = {
+      ...hand,
+      points: hand.points.map((point) => engine.toWorld(point)),
+      pinchPoint: engine.toWorld(hand.pinchPoint),
+      pointOrigin: engine.toWorld(hand.pointOrigin),
+      pointDirection: engine.aim(hand.pointDirection),
+    };
+  }
+  return placed;
 }
 
 export function startRuntime(
@@ -221,13 +240,17 @@ export function startRuntime(
 
     const studio = useStudio.getState();
     mediapipe.invertHands = studio.invertHands;
+    engine.prepareView(studio.eyeHeight, studio.stayHere);
     const cycle = Math.floor(now / 1000 / 14);
     if (mode === "demo" && studio.demoDrive && cycle !== lastCycle) {
       lastCycle = cycle;
       if (studio.selectedId !== "cube-demo" && !held.left && !held.right) studio.parkDemoCube();
     }
 
-    const frame = mode === "camera" ? mediapipe.sample(now) : sampleDemo(now, studio.space, DEMO_CUBE);
+    const cubeWorld = studio.objects.find((object) => object.id === "cube-demo")?.position ?? DEMO_CUBE;
+    const cubeLocal = engine.toLocal(cubeWorld);
+    if (cubeLocal[2] > -0.32) cubeLocal[2] = -0.48;
+    const frame = mode === "camera" ? mediapipe.sample(now) : sampleDemo(now, studio.space, cubeLocal);
     if (!frame) {
       engine.frame(viewFrom(useStudio.getState()));
       return;
@@ -240,6 +263,8 @@ export function startRuntime(
       smoothing: studio.smoothing,
       invertHands: studio.invertHands,
     });
+    const carried = carryHands(tracked.hands, engine);
+    const anchors = buildAnchors(carried);
     const previous = { left: held.left, right: held.right };
     const liveObjects = studio.objects.map((object) => {
       const pose = engine.readTransform(object.id);
@@ -247,7 +272,7 @@ export function startRuntime(
     });
     const result = stepInteraction(
       interaction,
-      tracked.hands,
+      carried,
       liveObjects,
       (origin, direction) => engine.raycast(origin, direction),
       (point) => engine.pickThrough(point),
@@ -273,11 +298,11 @@ export function startRuntime(
         videoCanvas: null,
         videoRevision: mode === "camera" ? mediapipe.revision : 0,
         hands: {
-          left: tracked.hands.left
-            ? { points: tracked.hands.left.points, rotation: palmRotation(tracked.hands.left.points) }
+          left: carried.left
+            ? { points: carried.left.points, rotation: palmRotation(carried.left.points) }
             : undefined,
-          right: tracked.hands.right
-            ? { points: tracked.hands.right.points, rotation: palmRotation(tracked.hands.right.points) }
+          right: carried.right
+            ? { points: carried.right.points, rotation: palmRotation(carried.right.points) }
             : undefined,
         },
         rays: result.rays,
@@ -335,13 +360,13 @@ export function startRuntime(
         latencyMs: frame.latencyMs,
         source: frame.source,
         handCount: Number(Boolean(tracked.hands.left)) + Number(Boolean(tracked.hands.right)),
-        left: hud(tracked.hands.left),
-        right: hud(tracked.hands.right),
+        left: hud(carried.left),
+        right: hud(carried.right),
         hoveredId: result.hoveredId,
         grabbedId,
         grabbingHand,
         anchors: KEY_ANCHOR_IDS.map((id) => {
-          const anchor = tracked.anchors.find((item) => item.id === id);
+          const anchor = anchors.find((item) => item.id === id);
           return {
             id,
             label: anchor?.label ?? id,

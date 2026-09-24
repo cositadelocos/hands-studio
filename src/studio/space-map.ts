@@ -1,15 +1,15 @@
 import { clamp, lerp } from "@/studio/math";
 import type { Vec3 } from "@/studio/math";
-import { TABLE_Z, type InteractionSpace, type NormPoint } from "@/studio/types";
+import type { InteractionSpace, NormPoint } from "@/studio/types";
 
 const SPAN_NEAR = 0.035;
 const SPAN_RANGE = 0.16;
 /** Hands stay in front of the camera, in a band you can see head-on. */
 const HAND_HALF_X = 0.72;
-const HAND_Y_CENTER = 1.02;
-const HAND_Y_SPAN = 0.85;
+const HAND_Y_BIAS = 0.38;
+const HAND_Y_SPAN = 0.7;
 const HAND_Z_NEAR = -0.34;
-const HAND_Z_FAR = TABLE_Z + 0.2;
+const HAND_Z_FAR = -0.95;
 
 export function palmSpan(image: NormPoint[]): number {
   const wrist = image[0];
@@ -23,7 +23,7 @@ export function mapWrist(image: NormPoint, span: number, _space: InteractionSpac
   const closeness = closenessFromSpan(span);
   return [
     (image.x - 0.5) * HAND_HALF_X * 2,
-    HAND_Y_CENTER + (0.42 - image.y) * HAND_Y_SPAN,
+    (HAND_Y_BIAS - image.y) * HAND_Y_SPAN,
     lerp(HAND_Z_FAR, HAND_Z_NEAR, closeness),
   ];
 }
@@ -31,7 +31,7 @@ export function mapWrist(image: NormPoint, span: number, _space: InteractionSpac
 export function wristToImage(wrist: Vec3, _space: InteractionSpace): { x: number; y: number } {
   return {
     x: wrist[0] / (HAND_HALF_X * 2) + 0.5,
-    y: 0.42 - (wrist[1] - HAND_Y_CENTER) / HAND_Y_SPAN,
+    y: HAND_Y_BIAS - wrist[1] / HAND_Y_SPAN,
   };
 }
 

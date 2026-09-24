@@ -92,8 +92,8 @@ interface Pose {
 
 function demoPoses(time: number, cube: Vec3): { left: Pose; right: Pose } {
   const u = ((time % 14) + 14) % 14;
-  const leftPresent: Pose = { wrist: [-0.22, 0.98, -0.55], curl: OPEN };
-  const rightPresent: Pose = { wrist: [0.24, 1, -0.5], curl: POINT };
+  const leftPresent: Pose = { wrist: [-0.2, -0.06, -0.52], curl: OPEN };
+  const rightPresent: Pose = { wrist: [0.22, -0.04, -0.5], curl: POINT };
 
   let left = leftPresent;
   if (u >= 2.2 && u < 4) {
@@ -122,7 +122,7 @@ function demoPoses(time: number, cube: Vec3): { left: Pose; right: Pose } {
   let right = rightPresent;
   if (u >= 9 && u < 11.5) {
     const k = smooth((u - 9) / 1.2);
-    right = { wrist: [0.22, 1.02 + Math.sin(time * 2.2) * 0.02, -0.48], curl: lerpCurl(POINT, OPEN, k) };
+    right = { wrist: [0.2, -0.02 + Math.sin(time * 2.2) * 0.02, -0.48], curl: lerpCurl(POINT, OPEN, k) };
   } else if (u >= 11.5) {
     right = { wrist: rightPresent.wrist, curl: lerpCurl(OPEN, POINT, smooth((u - 11.5) / 1.4)) };
   } else {

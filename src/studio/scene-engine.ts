@@ -22,6 +22,7 @@ import {
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
+  Quaternion,
   Raycaster,
   Scene,
   SphereGeometry,
@@ -146,6 +147,8 @@ export class SceneEngine {
   private pitch = -0.42;
   private lookX = 0;
   private lookY = 0;
+  private readonly viewInverse = new Quaternion();
+  private readonly scratch = new Vector3();
   private readonly root: Group;
   private videoTexture: CanvasTexture | null = null;
   private videoRevision = -1;
@@ -441,6 +444,29 @@ export class SceneEngine {
     this.clearRoomModel();
     this.room.visible = false;
     this.wall.visible = false;
+  }
+
+  prepareView(eye: number, stay: boolean): void {
+    if (stay) this.applyLook(eye);
+    this.camera.updateMatrixWorld(true);
+    this.viewInverse.copy(this.camera.quaternion).invert();
+  }
+
+  /** Camera-local point (x right, y up, -z forward) → world. */
+  toWorld(local: Vec3): Vec3 {
+    this.scratch.set(local[0], local[1], local[2]);
+    this.scratch.applyQuaternion(this.camera.quaternion).add(this.camera.position);
+    return [this.scratch.x, this.scratch.y, this.scratch.z];
+  }
+
+  toLocal(world: Vec3): Vec3 {
+    this.scratch.set(world[0], world[1], world[2]).sub(this.camera.position).applyQuaternion(this.viewInverse);
+    return [this.scratch.x, this.scratch.y, this.scratch.z];
+  }
+
+  aim(direction: Vec3): Vec3 {
+    this.scratch.set(direction[0], direction[1], direction[2]).applyQuaternion(this.camera.quaternion);
+    return [this.scratch.x, this.scratch.y, this.scratch.z];
   }
 
   frame(view: FrameView): void {
