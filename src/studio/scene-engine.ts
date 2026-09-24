@@ -435,6 +435,7 @@ export class SceneEngine {
       }
       previous.copy(node.position);
     }
+    this.keepOnTable();
 
     const moving = ids.some((id) => !held.has(id) && !this.sleeping.has(id) && this.nodes.get(id)?.visible);
     if (!moving && held.size === 0) return;
@@ -473,6 +474,32 @@ export class SceneEngine {
         this.sleeping.add(id);
         this.onRest?.(id, [node.position.x, node.position.y, node.position.z]);
       }
+    }
+  }
+
+  private keepOnTable(): void {
+    const maxX = this.floor.scale.x * 0.5;
+    const maxZ = this.floor.scale.y * 0.5;
+    const z0 = this.floor.position.z;
+    for (const [id, node] of this.nodes) {
+      if (!node.visible) continue;
+      this.boxA.setFromObject(node);
+      let dx = 0;
+      let dy = 0;
+      let dz = 0;
+      if (this.boxA.max.x > maxX) dx = maxX - this.boxA.max.x;
+      else if (this.boxA.min.x < -maxX) dx = -maxX - this.boxA.min.x;
+      if (this.boxA.max.z > z0 + maxZ) dz = z0 + maxZ - this.boxA.max.z;
+      else if (this.boxA.min.z < z0 - maxZ) dz = z0 - maxZ - this.boxA.min.z;
+      if (this.boxA.min.y < 0) dy = -this.boxA.min.y;
+      if (!dx && !dy && !dz) continue;
+      node.position.x += dx;
+      node.position.y += dy;
+      node.position.z += dz;
+      const velocity = this.velocityOf(id);
+      if (dx) velocity.x = 0;
+      if (dy) velocity.y = 0;
+      if (dz) velocity.z = 0;
     }
   }
 

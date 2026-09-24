@@ -115,7 +115,7 @@ export function LeftPanel() {
           <Toggle label="Landmarks" on={studio.showLandmarks} onClick={() => studio.patch({ showLandmarks: !studio.showLandmarks })} />
           <Toggle label="Esqueleto" on={studio.showSkeleton} onClick={() => studio.patch({ showSkeleton: !studio.showSkeleton })} />
           <Toggle label="Espacio de interacción" on={studio.showSpace} onClick={() => studio.patch({ showSpace: !studio.showSpace })} />
-          <Toggle label="Video de cámara" on={studio.showVideo} onClick={() => studio.patch({ showVideo: !studio.showVideo })} />
+          <Toggle label="Video pequeño" on={studio.showVideo} onClick={() => studio.patch({ showVideo: !studio.showVideo })} />
           <Toggle label="Mapa 2D" on={studio.showOverlay} onClick={() => studio.patch({ showOverlay: !studio.showOverlay })} />
           <Toggle label="Depuración" on={studio.debug} onClick={() => studio.patch({ debug: !studio.debug })} />
         </Section>

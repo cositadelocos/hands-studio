@@ -4,6 +4,8 @@ import type { InteractionSpace, NormPoint } from "@/studio/types";
 
 const SPAN_NEAR = 0.035;
 const SPAN_RANGE = 0.16;
+/** Image y that sits on the table. Higher puts a centered hand farther above the floor. */
+const WRIST_Y = 1.12;
 
 export function palmSpan(image: NormPoint[]): number {
   const wrist = image[0];
@@ -18,13 +20,13 @@ export function mapWrist(image: NormPoint, span: number, space: InteractionSpace
   const back = space.offsetZ - space.depth * 0.5;
   const front = space.offsetZ + space.depth * 0.5;
   const z = lerp(back, front, closeness);
-  return [(image.x - 0.5) * space.width, (0.55 - image.y) * space.height, z];
+  return [(image.x - 0.5) * space.width, (WRIST_Y - image.y) * space.height, z];
 }
 
 export function wristToImage(wrist: Vec3, space: InteractionSpace): { x: number; y: number } {
   return {
     x: wrist[0] / space.width + 0.5,
-    y: 0.55 - wrist[1] / space.height,
+    y: WRIST_Y - wrist[1] / space.height,
   };
 }
 

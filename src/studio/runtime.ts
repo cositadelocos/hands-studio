@@ -246,8 +246,8 @@ export function startRuntime(
     const fresh = useStudio.getState();
     engine.frame(
       viewFrom(fresh, {
-        showVideo: fresh.showVideo && mode === "camera",
-        videoCanvas: mode === "camera" ? mediapipe.display : null,
+        showVideo: false,
+        videoCanvas: null,
         videoRevision: mode === "camera" ? mediapipe.revision : 0,
         hands: {
           left: tracked.hands.left
