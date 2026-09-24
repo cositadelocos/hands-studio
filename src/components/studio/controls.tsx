@@ -113,7 +113,7 @@ export function LeftPanel() {
           <Toggle label="Invertir izquierda / derecha" on={studio.invertHands} onClick={() => studio.patch({ invertHands: !studio.invertHands })} />
           <Toggle label="Quedarme aquí" on={studio.stayHere} onClick={() => studio.patch({ stayHere: !studio.stayHere })} />
           <p className="mt-2 text-sm text-muted">
-            La cámara se queda en el centro. Arrastra el visor para girar sin salir del lugar.
+            La cámara se queda en el centro. En el visor, pellizca y arrastra los controles de abajo y del lado para mirar.
           </p>
           <Slider
             label="Altura de la vista"
@@ -124,25 +124,6 @@ export function LeftPanel() {
             display={formatMeters(studio.eyeHeight)}
             onChange={(eyeHeight) => studio.patch({ eyeHeight })}
           />
-          <Slider
-            label="Girar"
-            min={-22}
-            max={22}
-            step={1}
-            value={studio.lookYaw}
-            display={`${Math.round(studio.lookYaw)} °`}
-            onChange={(lookYaw) => studio.patch({ lookYaw })}
-          />
-          <Slider
-            label="Mirar arriba / abajo"
-            min={-14}
-            max={12}
-            step={1}
-            value={studio.lookPitch}
-            display={`${Math.round(studio.lookPitch)} °`}
-            onChange={(lookPitch) => studio.patch({ lookPitch })}
-          />
-          <p className="mt-2 text-sm text-muted">El giro es corto. Las manos siguen la mirada.</p>
         </Section>
 
         <Section title="VISUAL">

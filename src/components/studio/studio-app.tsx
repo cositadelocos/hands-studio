@@ -1,7 +1,63 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { DebugHud, LeftPanel, NoticeToast, RightPanel } from "@/components/studio/controls";
 import { pushCommand } from "@/studio/commands";
 import { useLive, useStudio } from "@/studio/store";
+
+function LookPads() {
+  const lookYaw = useStudio((state) => state.lookYaw);
+  const lookPitch = useStudio((state) => state.lookPitch);
+  const patch = useStudio((state) => state.patch);
+  const setFromPointer = (axis: "yaw" | "pitch", event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (axis === "yaw") {
+      const t = Math.min(1, Math.max(0, (event.clientX - rect.left) / (rect.width || 1)));
+      patch({ lookYaw: -22 + t * 44 });
+      return;
+    }
+    const t = Math.min(1, Math.max(0, (event.clientY - rect.top) / (rect.height || 1)));
+    patch({ lookPitch: 12 - t * 26 });
+  };
+  return (
+    <>
+      <div
+        data-look="yaw"
+        className="pointer-events-auto absolute bottom-4 left-1/2 flex h-12 w-52 -translate-x-1/2 items-center rounded-full border border-border bg-surface/80 px-3 sm:w-64"
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setFromPointer("yaw", event);
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) setFromPointer("yaw", event);
+        }}
+      >
+        <span className="pointer-events-none absolute left-3 font-mono text-[10px] text-muted">izq</span>
+        <span
+          className="pointer-events-none absolute top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-accent"
+          style={{ left: `calc(${((lookYaw + 22) / 44) * 100}% - 12px)` }}
+        />
+        <span className="pointer-events-none absolute right-3 font-mono text-[10px] text-muted">der</span>
+      </div>
+      <div
+        data-look="pitch"
+        className="pointer-events-auto absolute right-3 top-1/2 flex h-44 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface/80"
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setFromPointer("pitch", event);
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) setFromPointer("pitch", event);
+        }}
+      >
+        <span className="pointer-events-none absolute top-2 font-mono text-[10px] text-muted">arriba</span>
+        <span
+          className="pointer-events-none absolute left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-accent"
+          style={{ top: `calc(${((12 - lookPitch) / 26) * 100}% - 12px)` }}
+        />
+        <span className="pointer-events-none absolute bottom-2 font-mono text-[10px] text-muted">abajo</span>
+      </div>
+    </>
+  );
+}
 
 async function openFullscreen(element: HTMLElement): Promise<boolean> {
   const webkit = element as HTMLElement & { webkitRequestFullscreen?: () => void | Promise<void> };
@@ -155,6 +211,7 @@ export function StudioApp() {
             />
             <DebugHud />
             <NoticeToast />
+            <LookPads />
           </div>
         </main>
         <aside className="hidden w-80 shrink-0 border-l border-border bg-surface lg:block">

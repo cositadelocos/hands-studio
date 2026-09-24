@@ -542,6 +542,16 @@ export class SceneEngine {
     return [this.scratch.x, this.scratch.y, this.scratch.z];
   }
 
+  projectToClient(point: Vec3): { x: number; y: number } | null {
+    this.scratch.set(point[0], point[1], point[2]).project(this.camera);
+    if (this.scratch.z < -1 || this.scratch.z > 1) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return {
+      x: rect.left + (this.scratch.x * 0.5 + 0.5) * rect.width,
+      y: rect.top + (-this.scratch.y * 0.5 + 0.5) * rect.height,
+    };
+  }
+
   frame(view: FrameView): void {
     this.layout(view.space, view.showSpace);
     if (view.objects !== this.objectRef) {

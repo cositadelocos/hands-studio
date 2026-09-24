@@ -15,6 +15,63 @@ const DEMO_CUBE: Vec3 = [-0.35, 0.8, -0.95];
 
 import { KEY_ANCHOR_IDS, buildAnchors, palmRotation } from "@/studio/anchors";
 
+function lookPad(kind: "yaw" | "pitch"): HTMLElement | null {
+  return document.querySelector(`[data-look="${kind}"]`);
+}
+
+function overPad(element: HTMLElement | null, x: number, y: number): boolean {
+  if (!element) return false;
+  const rect = element.getBoundingClientRect();
+  return x >= rect.left - 36 && x <= rect.right + 36 && y >= rect.top - 36 && y <= rect.bottom + 36;
+}
+
+function lookFromPoint(kind: "yaw" | "pitch", x: number, y: number): number | null {
+  const element = lookPad(kind);
+  if (!element) return null;
+  const rect = element.getBoundingClientRect();
+  if (kind === "yaw") {
+    const t = Math.min(1, Math.max(0, (x - rect.left) / (rect.width || 1)));
+    return -22 + t * 44;
+  }
+  const t = Math.min(1, Math.max(0, (y - rect.top) / (rect.height || 1)));
+  return 12 - t * 26;
+}
+
+function steerLook(
+  hands: Partial<Record<Side, StudioHand>>,
+  engine: SceneEngine,
+  drag: { side: Side | null; axis: "yaw" | "pitch" | null },
+): Partial<Record<Side, StudioHand>> {
+  const steered = { ...hands };
+  let used: Side | null = null;
+  for (const side of ["left", "right"] as const) {
+    const hand = hands[side];
+    if (!hand?.pinch) continue;
+    const screen = engine.projectToClient(hand.pinchPoint);
+    if (!screen) continue;
+    let axis = drag.side === side ? drag.axis : null;
+    if (!axis && overPad(lookPad("yaw"), screen.x, screen.y)) axis = "yaw";
+    else if (!axis && overPad(lookPad("pitch"), screen.x, screen.y)) axis = "pitch";
+    if (!axis) continue;
+    const value = lookFromPoint(axis, screen.x, screen.y);
+    if (value === null) continue;
+    drag.side = side;
+    drag.axis = axis;
+    used = side;
+    if (axis === "yaw") useStudio.getState().patch({ lookYaw: value });
+    else useStudio.getState().patch({ lookPitch: value });
+    break;
+  }
+  if (!used) {
+    drag.side = null;
+    drag.axis = null;
+  } else {
+    const hand = steered[used];
+    if (hand) steered[used] = { ...hand, pinch: false };
+  }
+  return steered;
+}
+
 function stampName(): string {
   const now = new Date();
   const pad = (value: number) => String(value).padStart(2, "0");
@@ -89,6 +146,7 @@ export function startRuntime(
   const memory = createPipelineMemory();
   const interaction = createInteractionMemory();
   const recorder = new SessionRecorder();
+  const lookDrag: { side: Side | null; axis: "yaw" | "pitch" | null } = { side: null, axis: null };
   let mode: "demo" | "camera" = "demo";
   let cameraToken = 0;
   let frames = 0;
@@ -281,6 +339,7 @@ export function startRuntime(
       invertHands: studio.invertHands,
     });
     const carried = carryHands(tracked.hands, engine);
+    const forGrab = steerLook(carried, engine, lookDrag);
     const anchors = buildAnchors(carried);
     const previous = { left: held.left, right: held.right };
     const liveObjects = studio.objects.map((object) => {
@@ -289,7 +348,7 @@ export function startRuntime(
     });
     const result = stepInteraction(
       interaction,
-      carried,
+      forGrab,
       liveObjects,
       (origin, direction) => engine.raycast(origin, direction),
       (point) => engine.pickThrough(point),
