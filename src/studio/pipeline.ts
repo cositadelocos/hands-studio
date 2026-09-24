@@ -46,7 +46,7 @@ export function advanceTracking(
     const raw = assigned[side];
     if (!raw || raw.world.length < 21 || raw.image.length < 21) {
       memory.smooth.lost[side] += 1;
-      if (memory.smooth.lost[side] > 6) {
+      if (memory.smooth.lost[side] > 18) {
         delete memory.smooth.points[side];
         delete memory.smooth.span[side];
         delete memory.smooth.pinch[side];

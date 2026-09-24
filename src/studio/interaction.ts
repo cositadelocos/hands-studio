@@ -1,4 +1,4 @@
-import { clamp } from "@/studio/math";
+import { clamp, vdist } from "@/studio/math";
 import type { Vec3 } from "@/studio/math";
 import type { InteractionSpace, SceneObject, Side, StudioHand } from "@/studio/types";
 
@@ -8,6 +8,8 @@ export interface Hold {
   offsetY: number;
   z: number;
   span: number;
+  last: Vec3;
+  miss: number;
 }
 
 export interface InteractionMemory {
@@ -61,8 +63,8 @@ function nearestPlanar(
   let bestD = Infinity;
   for (const object of objects) {
     if (!object.grabbable || !object.visible || taken(object.id)) continue;
-    const distance = Math.hypot(point[0] - object.position[0], point[1] - object.position[1]);
-    const limit = objectRadius(object) + 0.12;
+    const distance = vdist(point, object.position);
+    const limit = objectRadius(object) + 0.28;
     if (distance < limit && distance < bestD) {
       bestD = distance;
       best = object.id;
@@ -97,18 +99,24 @@ export function stepInteraction(
     const hand = hands[side];
     const hold = holds[side];
     if (!hold) continue;
-    if (!allowManipulate || !hand?.pinch || !objects.some((object) => object.id === hold.id && object.visible)) {
-      delete holds[side];
+    const keep = allowManipulate && objects.some((object) => object.id === hold.id && object.visible);
+    if (!keep || !hand?.pinch) {
+      hold.miss += 1;
+      if (!keep || hold.miss > 20) {
+        delete holds[side];
+        continue;
+      }
+      moves.push({ id: hold.id, position: hold.last });
       continue;
     }
-    moves.push({
-      id: hold.id,
-      position: [
-        hand.pinchPoint[0] + hold.offsetX,
-        hand.pinchPoint[1] + hold.offsetY,
-        clamp(hold.z + (hand.span - hold.span) * 1.6, hold.z - 0.55, hold.z + 0.55),
-      ],
-    });
+    hold.miss = 0;
+    const position: Vec3 = [
+      hand.pinchPoint[0] + hold.offsetX,
+      hand.pinchPoint[1] + hold.offsetY,
+      clamp(hold.z + (hand.span - hold.span) * 1.6, hold.z - 0.55, hold.z + 0.55),
+    ];
+    hold.last = position;
+    moves.push({ id: hold.id, position });
   }
 
   for (const side of ["left", "right"] as const) {
@@ -140,6 +148,8 @@ export function stepInteraction(
       offsetY: object.position[1] - hand.pinchPoint[1],
       z: object.position[2],
       span: hand.span,
+      last: [object.position[0], object.position[1], object.position[2]],
+      miss: 0,
     };
   }
 

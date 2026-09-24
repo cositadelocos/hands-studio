@@ -32,8 +32,8 @@ export function readGestures(points: Vec3[], params: GestureParams): GestureRead
   const indexTip = points[8] ?? points[0] ?? [0, 0, 0];
   const pinchDistance = vdist(thumb, indexTip);
   const imagePinch = params.imagePinch ?? 1;
-  const close = pinchDistance < params.pinchThreshold || imagePinch < 0.06;
-  const still = pinchDistance < params.pinchThreshold * 1.55 || imagePinch < 0.09;
+  const close = pinchDistance < params.pinchThreshold || imagePinch < 0.085;
+  const still = pinchDistance < params.pinchThreshold * 1.8 || imagePinch < 0.14;
   const pinch = params.wasPinch ? still : close;
   const pinchPoint: Vec3 = [
     (thumb[0] + indexTip[0]) * 0.5,

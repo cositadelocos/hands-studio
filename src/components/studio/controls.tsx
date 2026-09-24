@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { pushCommand } from "@/studio/commands";
 import { formatMeters, useLive, useStudio } from "@/studio/store";
 import type { AnchorHud, HandHud } from "@/studio/store";
-import type { SceneObject, TransformMode } from "@/studio/types";
+import type { SceneObject } from "@/studio/types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -376,31 +376,6 @@ export function LeftPanel() {
   );
 }
 
-const MODES: { id: TransformMode; label: string }[] = [
-  { id: "translate", label: "Mover" },
-  { id: "rotate", label: "Rotar" },
-  { id: "scale", label: "Escala" },
-];
-
-export function ModeSwitch({ className = "" }: { className?: string }) {
-  const mode = useStudio((state) => state.transformMode);
-  const setTransformMode = useStudio((state) => state.setTransformMode);
-  return (
-    <div className={`grid grid-cols-3 gap-1 rounded-md border border-border bg-bg p-1 ${className}`}>
-      {MODES.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => setTransformMode(item.id)}
-          className={`min-h-11 rounded-sm text-sm ${mode === item.id ? "bg-accent font-medium text-accent-fg" : "text-muted"}`}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   return (
     <label className="flex flex-col gap-1">
@@ -437,7 +412,6 @@ function InspectorObject({ object }: { object: SceneObject }) {
       <p className="font-mono text-xs text-muted">
         {object.kind} · {object.id}
       </p>
-      <ModeSwitch />
       <div className="grid grid-cols-3 gap-2">
         {(["X", "Y", "Z"] as const).map((axis, index) => (
           <NumberField key={axis} label={`Pos ${axis}`} value={object.position[index] ?? 0} onChange={(value) => setVector("position", index, value)} />

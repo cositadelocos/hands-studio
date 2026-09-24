@@ -34,6 +34,7 @@ export class MediaPipeSource {
   invertHands = false;
   revision = 0;
   private lastDetectAt = -1;
+  private lastHandsAt = 0;
   private detectGap = 90;
 
   constructor(private readonly video: HTMLVideoElement) {
@@ -138,8 +139,13 @@ export class MediaPipeSource {
     });
     const elapsed = performance.now() - started;
     this.detectGap = elapsed > 32 ? 160 : elapsed > 18 ? 110 : 70;
+    if (hands.length === 0 && this.last && this.last.hands.length > 0 && now - this.lastHandsAt < 350) {
+      this.last = { ...this.last, timestamp, latencyMs: elapsed };
+      return this.last;
+    }
+    if (hands.length > 0) this.lastHandsAt = now;
     this.revision += 1;
-    this.last = { timestamp, latencyMs: performance.now() - started, source: "mediapipe", hands };
+    this.last = { timestamp, latencyMs: elapsed, source: "mediapipe", hands };
     return this.last;
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { DebugHud, LeftPanel, ModeSwitch, NoticeToast, RightPanel } from "@/components/studio/controls";
+import { DebugHud, LeftPanel, NoticeToast, RightPanel } from "@/components/studio/controls";
 import { pushCommand } from "@/studio/commands";
 import { useLive, useStudio } from "@/studio/store";
 
@@ -125,10 +125,6 @@ export function StudioApp() {
             >
               {fill ? "Salir" : "Pantalla completa"}
             </button>
-            <div className="pointer-events-auto absolute left-1/2 top-3 w-52 -translate-x-1/2 sm:w-64">
-              <ModeSwitch />
-              <p className="mt-1 text-center font-mono text-xs text-muted">el objeto seleccionado</p>
-            </div>
             <div className="absolute left-3 top-16 flex flex-col gap-1 text-xs sm:top-3">
               <span className="text-sm font-semibold tracking-tight text-fg sm:hidden">cositadelocos</span>
               <span className="hidden text-hand-l sm:block">Izquierda</span>
