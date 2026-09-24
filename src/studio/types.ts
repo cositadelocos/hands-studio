@@ -144,6 +144,8 @@ export const STUDIO_EYE = 1.25;
 export const TABLE_TOP = 0.74;
 export const TABLE_WIDTH = 1.7;
 export const TABLE_DEPTH = 1.2;
+/** Table center, in front of the camera (camera looks down -Z). */
+export const TABLE_Z = -1.15;
 
 export interface PanoramaSettings {
   name: string;

@@ -11,7 +11,7 @@ import { useLive, useStudio, type HandHud, type StudioState } from "@/studio/sto
 import type { Side, StudioHand } from "@/studio/types";
 import { STUDIO_EYE } from "@/studio/types";
 
-const DEMO_CUBE: Vec3 = [-0.55, 0.8, 0.25];
+const DEMO_CUBE: Vec3 = [-0.35, 0.8, -0.95];
 
 import { KEY_ANCHOR_IDS, palmRotation } from "@/studio/anchors";
 

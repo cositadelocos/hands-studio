@@ -4,6 +4,7 @@ import {
   DEFAULT_SPACE,
   OBJECT_COLORS,
   TABLE_TOP,
+  TABLE_Z,
   type InteractionSpace,
   type PanoramaSettings,
   type SceneObject,
@@ -69,7 +70,7 @@ function defaultObjects(): SceneObject[] {
       id: "cube-demo",
       name: "Cubo",
       kind: "box",
-      position: [-0.55, 0.8, 0.25],
+      position: [-0.35, 0.8, -0.95],
       rotation: [0, 0.4, 0],
       scale: [0.12, 0.12, 0.12],
       visible: true,
@@ -81,7 +82,7 @@ function defaultObjects(): SceneObject[] {
       id: "sphere-demo",
       name: "Esfera",
       kind: "sphere",
-      position: [0.6, 0.81, -0.15],
+      position: [0.38, 0.81, -1.35],
       rotation: [0, 0, 0],
       scale: [0.14, 0.14, 0.14],
       visible: true,
@@ -93,7 +94,7 @@ function defaultObjects(): SceneObject[] {
       id: "torus-demo",
       name: "Toro",
       kind: "torus",
-      position: [0.05, 0.78, 0.55],
+      position: [0, 0.78, -1.05],
       rotation: [Math.PI / 2, 0, 0.25],
       scale: [0.2, 0.2, 0.2],
       visible: true,
@@ -121,14 +122,14 @@ const saved = loadPersisted();
 
 function spreadObjects(objects: SceneObject[]): SceneObject[] {
   const parked: Record<string, Vec3> = {
-    "cube-demo": [-0.55, 0.8, 0.25],
-    "sphere-demo": [0.6, 0.81, -0.15],
-    "torus-demo": [0.05, 0.78, 0.55],
+    "cube-demo": [-0.35, 0.8, -0.95],
+    "sphere-demo": [0.38, 0.81, -1.35],
+    "torus-demo": [0, 0.78, -1.05],
   };
   return objects.map((object) => {
     const next = parked[object.id];
     if (!next) return object;
-    if (object.position[1] >= 0.5) return object;
+    if (object.position[2] < -0.5) return object;
     return { ...object, position: next };
   });
 }
@@ -236,7 +237,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         id: `${kind}-${crypto.randomUUID().slice(0, 6)}`,
         name: kind === "box" ? "Cubo" : kind === "sphere" ? "Esfera" : kind === "torus" ? "Toro" : "Cilindro",
         kind,
-        position: [((index % 5) - 2) * 0.32, y, 0.6],
+        position: [((index % 5) - 2) * 0.28, y, TABLE_Z - 0.05],
         rotation: kind === "torus" ? [Math.PI / 2, 0, 0] : [0, 0, 0],
         scale: [scale, scale, scale],
         visible: true,
@@ -260,7 +261,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     set((state) => ({
       objects: state.objects.map((object) =>
         object.id === "cube-demo"
-          ? { ...object, position: [-0.55, 0.8, 0.25], rotation: [0, 0.4, 0], scale: [0.12, 0.12, 0.12] }
+          ? { ...object, position: [-0.35, 0.8, -0.95], rotation: [0, 0.4, 0], scale: [0.12, 0.12, 0.12] }
           : object,
       ),
     })),

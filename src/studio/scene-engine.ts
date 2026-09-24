@@ -35,7 +35,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { Vec3 } from "@/studio/math";
-import { HAND_BONES, STUDIO_EYE, TABLE_DEPTH, TABLE_TOP, TABLE_WIDTH, type InteractionSpace, type PanoramaSettings, type SceneObject, type Side, type TransformMode } from "@/studio/types";
+import { HAND_BONES, STUDIO_EYE, TABLE_DEPTH, TABLE_TOP, TABLE_WIDTH, TABLE_Z, type InteractionSpace, type PanoramaSettings, type SceneObject, type Side, type TransformMode } from "@/studio/types";
 import type { RayHit } from "@/studio/interaction";
 
 export interface HandView {
@@ -143,7 +143,7 @@ export class SceneEngine {
   private roomFit = 1;
   private stayHere = true;
   private yaw = 0;
-  private pitch = -0.32;
+  private pitch = -0.42;
   private lookX = 0;
   private lookY = 0;
   private readonly root: Group;
@@ -198,13 +198,13 @@ export class SceneEngine {
       new BoxGeometry(TABLE_WIDTH, 0.08, TABLE_DEPTH),
       new MeshLambertMaterial({ color: 0xc4a574, emissive: 0x4a3724, emissiveIntensity: 0.35 }),
     );
-    this.table.position.set(0, TABLE_TOP - 0.04, 0);
+    this.table.position.set(0, TABLE_TOP - 0.04, TABLE_Z);
 
     this.wall = new Mesh(new PlaneGeometry(1, 1, 1, 1), new MeshLambertMaterial({ color: 0x141b21 }));
     this.wall.visible = false;
 
     this.grid = new GridHelper(1.2, 6, 0x6b5844, 0x3d342c);
-    this.grid.position.y = TABLE_TOP + 0.002;
+    this.grid.position.set(0, TABLE_TOP + 0.002, TABLE_Z);
 
     this.volume = new LineSegments(
       new EdgesGeometry(new BoxGeometry(1, 1, 1)),
@@ -617,7 +617,7 @@ export class SceneEngine {
   private keepOnTable(): void {
     const maxX = TABLE_WIDTH * 0.5;
     const maxZ = TABLE_DEPTH * 0.5;
-    const z0 = 0;
+    const z0 = this.table.position.z;
     for (const [id, node] of this.nodes) {
       if (!node.visible) continue;
       this.boxA.setFromObject(node);
@@ -729,11 +729,11 @@ export class SceneEngine {
       this.spaceKey = key;
       this.floor.scale.set(space.width, space.depth, 1);
       this.floor.position.set(0, 0, space.offsetZ);
-      this.table.position.set(0, TABLE_TOP - 0.04, space.offsetZ);
+      this.table.position.set(0, TABLE_TOP - 0.04, space.offsetZ + TABLE_Z);
       this.wall.scale.set(space.width, space.height, 1);
       this.wall.position.set(0, space.height / 2, space.offsetZ - space.depth / 2 - 0.012);
       this.grid.scale.set(TABLE_WIDTH / 1.2, 1, TABLE_DEPTH / 1.2);
-      this.grid.position.set(0, TABLE_TOP + 0.002, space.offsetZ);
+      this.grid.position.set(0, TABLE_TOP + 0.002, space.offsetZ + TABLE_Z);
       this.volume.geometry.dispose();
       this.volume.geometry = new EdgesGeometry(new BoxGeometry(space.width, space.height, space.depth));
       this.volume.position.set(0, space.height / 2, space.offsetZ);
