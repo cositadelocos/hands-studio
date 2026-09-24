@@ -6,7 +6,11 @@ import { useLive, useStudio } from "@/studio/store";
 function LookPads() {
   const lookYaw = useStudio((state) => state.lookYaw);
   const lookPitch = useStudio((state) => state.lookPitch);
+  const hold = useLive((state) => state.lookHold);
+  const setLookHold = useLive((state) => state.setLookHold);
   const patch = useStudio((state) => state.patch);
+  const yawT = (lookYaw + 36) / 72;
+  const pitchT = (20 - lookPitch) / 44;
   const setFromPointer = (axis: "yaw" | "pitch", event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (axis === "yaw") {
@@ -17,43 +21,63 @@ function LookPads() {
     const t = Math.min(1, Math.max(0, (event.clientY - rect.top) / (rect.height || 1)));
     patch({ lookPitch: 20 - t * 44 });
   };
+  const grab = (axis: "yaw" | "pitch", event: PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setLookHold(axis);
+    setFromPointer(axis, event);
+  };
   return (
     <>
       <div
         data-look="yaw"
-        className="pointer-events-auto absolute bottom-4 left-1/2 flex h-12 w-72 -translate-x-1/2 touch-none items-center rounded-full border border-border bg-surface/80 px-3 sm:w-96"
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId);
-          setFromPointer("yaw", event);
-        }}
+        className={`pointer-events-auto absolute bottom-5 left-1/2 flex w-[min(32rem,82vw)] -translate-x-1/2 touch-none flex-col gap-2 rounded-2xl border px-4 py-3 backdrop-blur ${hold === "yaw" ? "border-accent bg-accent/15" : "border-white/15 bg-black/45"}`}
+        onPointerDown={(event) => grab("yaw", event)}
         onPointerMove={(event) => {
           if (event.currentTarget.hasPointerCapture(event.pointerId)) setFromPointer("yaw", event);
         }}
+        onPointerUp={() => setLookHold(null)}
+        onPointerCancel={() => setLookHold(null)}
       >
-        <span className="pointer-events-none absolute left-3 font-mono text-[10px] text-muted">izq</span>
-        <span
-          className="pointer-events-none absolute top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-accent"
-          style={{ left: `calc(${((lookYaw + 36) / 72) * 100}% - 12px)` }}
-        />
-        <span className="pointer-events-none absolute right-3 font-mono text-[10px] text-muted">der</span>
+        <span className={`text-center font-mono text-[10px] tracking-widest ${hold === "yaw" ? "text-accent" : "text-white/55"}`}>
+          {hold === "yaw" ? "GIRANDO" : "GIRAR"}
+        </span>
+        <div className="relative h-8">
+          <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/20" />
+          <div
+            className={`absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full ${hold === "yaw" ? "bg-accent" : "bg-white/40"}`}
+            style={{ width: `${yawT * 100}%` }}
+          />
+          <span className="absolute left-0 top-0 font-mono text-[10px] text-white/45">izq</span>
+          <span className="absolute right-0 top-0 font-mono text-[10px] text-white/45">der</span>
+          <span
+            className={`absolute top-1/2 h-6 w-6 -translate-y-1/2 rounded-full border-2 ${hold === "yaw" ? "border-white bg-accent" : "border-white/80 bg-bg"}`}
+            style={{ left: `calc(${yawT * 100}% - 12px)` }}
+          />
+        </div>
       </div>
       <div
         data-look="pitch"
-        className="pointer-events-auto absolute right-3 top-1/2 flex h-64 w-12 -translate-y-1/2 touch-none items-center justify-center rounded-full border border-border bg-surface/80"
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId);
-          setFromPointer("pitch", event);
-        }}
+        className={`pointer-events-auto absolute right-4 top-1/2 flex h-72 w-14 -translate-y-1/2 touch-none flex-col items-center rounded-2xl border py-3 backdrop-blur ${hold === "pitch" ? "border-accent bg-accent/15" : "border-white/15 bg-black/45"}`}
+        onPointerDown={(event) => grab("pitch", event)}
         onPointerMove={(event) => {
           if (event.currentTarget.hasPointerCapture(event.pointerId)) setFromPointer("pitch", event);
         }}
+        onPointerUp={() => setLookHold(null)}
+        onPointerCancel={() => setLookHold(null)}
       >
-        <span className="pointer-events-none absolute top-2 font-mono text-[10px] text-muted">arriba</span>
-        <span
-          className="pointer-events-none absolute left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-accent"
-          style={{ top: `calc(${((20 - lookPitch) / 44) * 100}% - 12px)` }}
-        />
-        <span className="pointer-events-none absolute bottom-2 font-mono text-[10px] text-muted">abajo</span>
+        <span className={`font-mono text-[10px] tracking-widest ${hold === "pitch" ? "text-accent" : "text-white/55"}`}>arriba</span>
+        <div className="relative mt-2 h-52 w-8">
+          <div className="absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 rounded-full bg-white/20" />
+          <div
+            className={`absolute left-1/2 top-0 w-1 -translate-x-1/2 rounded-full ${hold === "pitch" ? "bg-accent" : "bg-white/40"}`}
+            style={{ height: `${pitchT * 100}%` }}
+          />
+          <span
+            className={`absolute left-1/2 h-6 w-6 -translate-x-1/2 rounded-full border-2 ${hold === "pitch" ? "border-white bg-accent" : "border-white/80 bg-bg"}`}
+            style={{ top: `calc(${pitchT * 100}% - 12px)` }}
+          />
+        </div>
+        <span className="mt-1 font-mono text-[10px] text-white/45">abajo</span>
       </div>
     </>
   );

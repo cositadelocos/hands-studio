@@ -57,7 +57,7 @@ export function mapHand(
   handScale: number,
   span = palmSpan(image),
 ): Vec3[] {
-  const scale = handScale * 0.88;
+  const scale = handScale * 0.62;
   const anchor = mapWrist(image[0] ?? { x: 0.5, y: 0.5, z: 0 }, span, space);
   const origin = world[0] ?? [0, 0, 0];
   return world.map((point) => [

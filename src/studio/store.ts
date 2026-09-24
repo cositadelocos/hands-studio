@@ -47,7 +47,7 @@ export interface LiveReport {
 export type CameraPhase = "demo" | "starting" | "live" | "error";
 
 interface Persisted {
-  version: 1;
+  version: 1 | 2;
   pinchThreshold: number;
   handScale: number;
   smoothing: number;
@@ -73,7 +73,7 @@ function defaultObjects(): SceneObject[] {
       id: "cube-demo",
       name: "Cubo",
       kind: "box",
-      position: [-0.35, 0.8, -0.95],
+      position: [-0.35, 0.8, -1.7],
       rotation: [0, 0.4, 0],
       scale: [0.12, 0.12, 0.12],
       visible: true,
@@ -85,7 +85,7 @@ function defaultObjects(): SceneObject[] {
       id: "sphere-demo",
       name: "Esfera",
       kind: "sphere",
-      position: [0.38, 0.81, -1.35],
+      position: [0.38, 0.81, -2.1],
       rotation: [0, 0, 0],
       scale: [0.14, 0.14, 0.14],
       visible: true,
@@ -97,7 +97,7 @@ function defaultObjects(): SceneObject[] {
       id: "torus-demo",
       name: "Toro",
       kind: "torus",
-      position: [0, 0.78, -1.05],
+      position: [0, 0.78, -1.8],
       rotation: [Math.PI / 2, 0, 0.25],
       scale: [0.2, 0.2, 0.2],
       visible: true,
@@ -114,7 +114,13 @@ function loadPersisted(): Partial<Persisted> | null {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as Persisted;
-    if (data.version !== 1 || !Array.isArray(data.objects)) return null;
+    if ((data.version !== 1 && data.version !== 2) || !Array.isArray(data.objects)) return null;
+    if (data.version === 1) {
+      data.objects = data.objects.map((object) => ({
+        ...object,
+        position: [object.position[0], object.position[1], object.position[2] - 0.75],
+      }));
+    }
     return data;
   } catch {
     return null;
@@ -125,9 +131,9 @@ const saved = loadPersisted();
 
 function spreadObjects(objects: SceneObject[]): SceneObject[] {
   const parked: Record<string, Vec3> = {
-    "cube-demo": [-0.35, 0.8, -0.95],
-    "sphere-demo": [0.38, 0.81, -1.35],
-    "torus-demo": [0, 0.78, -1.05],
+    "cube-demo": [-0.35, 0.8, -1.7],
+    "sphere-demo": [0.38, 0.81, -2.1],
+    "torus-demo": [0, 0.78, -1.8],
   };
   return objects.map((object) => {
     const next = parked[object.id];
@@ -185,7 +191,7 @@ export interface StudioState {
 
 function persist(state: StudioState): void {
   const data: Persisted = {
-    version: 1,
+    version: 2,
     pinchThreshold: state.pinchThreshold,
     handScale: state.handScale,
     smoothing: state.smoothing,
@@ -276,7 +282,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     set((state) => ({
       objects: state.objects.map((object) =>
         object.id === "cube-demo"
-          ? { ...object, position: [-0.35, 0.8, -0.95], rotation: [0, 0.4, 0], scale: [0.12, 0.12, 0.12] }
+          ? { ...object, position: [-0.35, 0.8, -1.7], rotation: [0, 0.4, 0], scale: [0.12, 0.12, 0.12] }
           : object,
       ),
     })),
@@ -306,11 +312,13 @@ interface LiveState {
   facing: "user" | "environment";
   recording: boolean;
   notice: string | null;
+  lookHold: "yaw" | "pitch" | null;
   setReport: (report: LiveReport) => void;
   setCamera: (camera: CameraPhase, error?: string | null) => void;
   setFacing: (facing: "user" | "environment") => void;
   setRecording: (recording: boolean) => void;
   setNotice: (notice: string | null) => void;
+  setLookHold: (lookHold: "yaw" | "pitch" | null) => void;
 }
 
 export const useLive = create<LiveState>((set) => ({
@@ -320,11 +328,13 @@ export const useLive = create<LiveState>((set) => ({
   facing: "user",
   recording: false,
   notice: null,
+  lookHold: null,
   setReport: (report) => set({ report }),
   setCamera: (camera, error = null) => set({ camera, cameraError: error }),
   setFacing: (facing) => set({ facing }),
   setRecording: (recording) => set({ recording }),
   setNotice: (notice) => set({ notice }),
+  setLookHold: (lookHold) => set({ lookHold }),
 }));
 
 export function formatMeters(value: number): string {

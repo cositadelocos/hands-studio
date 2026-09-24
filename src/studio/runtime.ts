@@ -11,7 +11,7 @@ import { useLive, useStudio, type HandHud, type StudioState } from "@/studio/sto
 import type { Side, StudioHand } from "@/studio/types";
 import { STUDIO_EYE } from "@/studio/types";
 
-const DEMO_CUBE: Vec3 = [-0.35, 0.8, -0.95];
+const DEMO_CUBE: Vec3 = [-0.35, 0.8, -1.7];
 
 import { KEY_ANCHOR_IDS, buildAnchors, palmRotation } from "@/studio/anchors";
 
@@ -47,7 +47,7 @@ function lookFromPoint(kind: "yaw" | "pitch", x: number, y: number): number | nu
 function steerLook(
   hands: Partial<Record<Side, StudioHand>>,
   engine: SceneEngine,
-  drag: { side: Side | null; axis: "yaw" | "pitch" | null; wasTight: Partial<Record<Side, boolean>> },
+  drag: { side: Side | null; axis: "yaw" | "pitch" | null; wasTight: Partial<Record<Side, boolean>>; fromHand: boolean },
 ): Partial<Record<Side, StudioHand>> {
   const steered = { ...hands };
   let used: Side | null = null;
@@ -83,6 +83,14 @@ function steerLook(
   } else {
     const hand = steered[used];
     if (hand) steered[used] = { ...hand, pinch: false };
+  }
+  const hold = used ? drag.axis : null;
+  if (used) {
+    drag.fromHand = true;
+    if (useLive.getState().lookHold !== hold) useLive.getState().setLookHold(hold);
+  } else if (drag.fromHand) {
+    drag.fromHand = false;
+    useLive.getState().setLookHold(null);
   }
   return steered;
 }
@@ -161,10 +169,11 @@ export function startRuntime(
   const memory = createPipelineMemory();
   const interaction = createInteractionMemory();
   const recorder = new SessionRecorder();
-  const lookDrag: { side: Side | null; axis: "yaw" | "pitch" | null; wasTight: Partial<Record<Side, boolean>> } = {
+  const lookDrag: { side: Side | null; axis: "yaw" | "pitch" | null; wasTight: Partial<Record<Side, boolean>>; fromHand: boolean } = {
     side: null,
     axis: null,
     wasTight: {},
+    fromHand: false,
   };
   let mode: "demo" | "camera" = "demo";
   let cameraToken = 0;

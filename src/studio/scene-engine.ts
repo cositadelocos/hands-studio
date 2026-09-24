@@ -371,7 +371,7 @@ export class SceneEngine {
     const aspect = width / height;
     if (width > 240 && !this.viewAspect) this.viewAspect = aspect;
     const base = this.viewAspect || aspect;
-    const horizontal = 2 * Math.atan(Math.tan((50 * Math.PI) / 360) * base);
+    const horizontal = 2 * Math.atan(Math.tan((74 * Math.PI) / 360) * base);
     this.camera.fov = (2 * Math.atan(Math.tan(horizontal / 2) / aspect) * 180) / Math.PI;
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
@@ -609,7 +609,7 @@ export class SceneEngine {
 
   private applyLook(eye: number): void {
     this.camera.position.set(0, eye, this.floor.position.z);
-    this.camera.rotation.set(this.pitch, this.yaw, 0);
+    this.camera.rotation.set(this.pitch, -this.yaw, 0);
   }
 
   private releaseLook(): void {
