@@ -72,6 +72,7 @@ export function LeftPanel() {
   const facing = useLive((state) => state.facing);
   const recording = useLive((state) => state.recording);
   const fileRef = useRef<HTMLInputElement>(null);
+  const panoramaRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="flex h-full flex-col">
@@ -109,6 +110,10 @@ export function LeftPanel() {
           </p>
           <Toggle label="La demo mueve objetos" on={studio.demoDrive} onClick={() => studio.patch({ demoDrive: !studio.demoDrive })} />
           <Toggle label="Invertir izquierda / derecha" on={studio.invertHands} onClick={() => studio.patch({ invertHands: !studio.invertHands })} />
+          <Toggle label="Quedarme aquí" on={studio.stayHere} onClick={() => studio.patch({ stayHere: !studio.stayHere })} />
+          <p className="mt-2 text-sm text-muted">
+            La cámara se queda en el centro de la mesa. Arrastra el visor para girar sin salir del lugar.
+          </p>
         </Section>
 
         <Section title="VISUAL">
@@ -123,8 +128,8 @@ export function LeftPanel() {
         <Section title="ESPACIO">
           <Slider
             label="Ancho"
-            min={0.45}
-            max={1.6}
+            min={0.8}
+            max={4}
             step={0.01}
             value={studio.space.width}
             display={formatMeters(studio.space.width)}
@@ -132,8 +137,8 @@ export function LeftPanel() {
           />
           <Slider
             label="Alto"
-            min={0.35}
-            max={1.2}
+            min={0.6}
+            max={3}
             step={0.01}
             value={studio.space.height}
             display={formatMeters(studio.space.height)}
@@ -141,8 +146,8 @@ export function LeftPanel() {
           />
           <Slider
             label="Profundidad"
-            min={0.28}
-            max={1.1}
+            min={0.6}
+            max={4}
             step={0.01}
             value={studio.space.depth}
             display={formatMeters(studio.space.depth)}
@@ -225,6 +230,86 @@ export function LeftPanel() {
           <button type="button" className="mt-2 min-h-11 w-full rounded-md border border-border text-sm text-muted" onClick={() => pushCommand({ type: "snapshot" })}>
             Exportar frame de tracking
           </button>
+        </Section>
+
+        <Section title="IMAGEN 360">
+          <button
+            type="button"
+            className="min-h-11 w-full rounded-md border border-border bg-surface-2 text-sm text-fg"
+            onClick={() => panoramaRef.current?.click()}
+          >
+            Cargar imagen 360
+          </button>
+          <input
+            ref={panoramaRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) pushCommand({ type: "panorama", file });
+            }}
+          />
+          {studio.panorama ? (
+            <>
+              <p className="mt-2 truncate text-sm text-muted">{studio.panorama.name}</p>
+              <Slider
+                label="Posición X"
+                min={-2}
+                max={2}
+                step={0.01}
+                value={studio.panorama.position[0]}
+                display={studio.panorama.position[0].toFixed(3)}
+                onChange={(x) => studio.patchPanorama({ position: [x, studio.panorama!.position[1], studio.panorama!.position[2]] })}
+              />
+              <Slider
+                label="Posición Y"
+                min={-1}
+                max={2}
+                step={0.01}
+                value={studio.panorama.position[1]}
+                display={studio.panorama.position[1].toFixed(3)}
+                onChange={(y) => studio.patchPanorama({ position: [studio.panorama!.position[0], y, studio.panorama!.position[2]] })}
+              />
+              <Slider
+                label="Posición Z"
+                min={-2}
+                max={2}
+                step={0.01}
+                value={studio.panorama.position[2]}
+                display={studio.panorama.position[2].toFixed(3)}
+                onChange={(z) => studio.patchPanorama({ position: [studio.panorama!.position[0], studio.panorama!.position[1], z] })}
+              />
+              <Slider
+                label="Escala"
+                min={1.5}
+                max={16}
+                step={0.01}
+                value={studio.panorama.scale}
+                display={studio.panorama.scale.toFixed(2)}
+                onChange={(scale) => studio.patchPanorama({ scale })}
+              />
+              <Slider
+                label="Rotación"
+                min={-180}
+                max={180}
+                step={1}
+                value={studio.panorama.rotation}
+                display={`${Math.round(studio.panorama.rotation)} °`}
+                onChange={(rotation) => studio.patchPanorama({ rotation })}
+              />
+              <button
+                type="button"
+                className="mt-3 min-h-11 w-full rounded-md border border-border text-sm text-muted"
+                onClick={() => pushCommand({ type: "panorama-clear" })}
+              >
+                Quitar imagen
+              </button>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted">Al cargarla quedas dentro, en el centro de la imagen.</p>
+          )}
         </Section>
 
         <p className="font-mono text-xs leading-relaxed text-muted">

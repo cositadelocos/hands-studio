@@ -4,6 +4,7 @@ import {
   DEFAULT_SPACE,
   OBJECT_COLORS,
   type InteractionSpace,
+  type PanoramaSettings,
   type SceneObject,
   type Side,
   type TransformMode,
@@ -116,6 +117,13 @@ function loadPersisted(): Partial<Persisted> | null {
 
 const saved = loadPersisted();
 
+function savedSpace(): InteractionSpace {
+  const space = saved?.space;
+  if (!space) return DEFAULT_SPACE;
+  if (space.width < 1.8 || space.depth < 1.2) return DEFAULT_SPACE;
+  return space;
+}
+
 export interface StudioState {
   pinchThreshold: number;
   handScale: number;
@@ -130,6 +138,8 @@ export interface StudioState {
   invertHands: boolean;
   transformMode: TransformMode;
   demoDrive: boolean;
+  stayHere: boolean;
+  panorama: PanoramaSettings | null;
   objects: SceneObject[];
   selectedId: string | null;
   setSpace: (patch: Partial<InteractionSpace>) => void;
@@ -140,6 +150,8 @@ export interface StudioState {
   commitTransform: (id: string, transform: Pick<SceneObject, "position" | "rotation" | "scale">) => void;
   addPrimitive: (kind: "box" | "sphere" | "torus" | "cylinder") => void;
   addObject: (object: SceneObject) => void;
+  setPanorama: (panorama: PanoramaSettings | null) => void;
+  patchPanorama: (patch: Partial<PanoramaSettings>) => void;
   removeSelected: () => void;
   resetObjects: () => void;
   parkDemoCube: () => void;
@@ -170,7 +182,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   pinchThreshold: saved?.pinchThreshold ?? 0.034,
   handScale: saved?.handScale ?? 1,
   smoothing: saved?.smoothing ?? 0.55,
-  space: saved?.space ?? DEFAULT_SPACE,
+  space: savedSpace(),
   showLandmarks: saved?.showLandmarks ?? true,
   showSkeleton: saved?.showSkeleton ?? true,
   showSpace: saved?.showSpace ?? true,
@@ -180,6 +192,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   invertHands: saved?.invertHands ?? false,
   transformMode: saved?.transformMode ?? "translate",
   demoDrive: saved?.demoDrive ?? true,
+  stayHere: true,
+  panorama: null,
   objects: saved?.objects?.length ? saved.objects : defaultObjects(),
   selectedId: null,
   setSpace: (patch) => set((state) => ({ space: { ...state.space, ...patch } })),
@@ -214,6 +228,9 @@ export const useStudio = create<StudioState>((set, get) => ({
       return { objects: [...state.objects, object], selectedId: object.id };
     }),
   addObject: (object) => set((state) => ({ objects: [...state.objects, object], selectedId: object.id })),
+  setPanorama: (panorama) => set({ panorama }),
+  patchPanorama: (patch) =>
+    set((state) => ({ panorama: state.panorama ? { ...state.panorama, ...patch } : null })),
   removeSelected: () =>
     set((state) => ({
       objects: state.objects.filter((object) => object.id !== state.selectedId),

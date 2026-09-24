@@ -132,10 +132,20 @@ export const HAND_BONES: ReadonlyArray<readonly [number, number]> = [
 ];
 
 export const DEFAULT_SPACE: InteractionSpace = {
-  width: 1.05,
-  height: 0.78,
-  depth: 0.62,
+  width: 2.8,
+  height: 1.7,
+  depth: 2.2,
   offsetZ: 0,
 };
+
+/** Eye height at the middle of the table. */
+export const STUDIO_EYE = 0.46;
+
+export interface PanoramaSettings {
+  name: string;
+  position: Vec3;
+  scale: number;
+  rotation: number;
+}
 
 export const OBJECT_COLORS = ["#e59a4a", "#3dbeb6", "#e07a5f"] as const;

@@ -1,5 +1,6 @@
 import {
   AxesHelper,
+  BackSide,
   Box3,
   BoxGeometry,
   BufferAttribute,
@@ -16,6 +17,7 @@ import {
   LineBasicMaterial,
   LineSegments,
   Mesh,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   Object3D,
   PerspectiveCamera,
@@ -33,7 +35,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { Vec3 } from "@/studio/math";
-import { HAND_BONES, type InteractionSpace, type SceneObject, type Side, type TransformMode } from "@/studio/types";
+import { HAND_BONES, STUDIO_EYE, type InteractionSpace, type PanoramaSettings, type SceneObject, type Side, type TransformMode } from "@/studio/types";
 import type { RayHit } from "@/studio/interaction";
 
 export interface HandView {
@@ -69,6 +71,8 @@ export interface FrameView {
   rays: Partial<Record<Side, RayView>>;
   moves: { id: string; position: Vec3 }[];
   hoveredId: string | null;
+  stayHere: boolean;
+  panorama: PanoramaSettings | null;
 }
 
 const LEFT = 0x3dbeb6;
@@ -104,6 +108,22 @@ function writeSegment(line: LineSegments, a: Vec3, b: Vec3): void {
   attribute.needsUpdate = true;
 }
 
+async function downscaleImage(file: File, maxEdge: number): Promise<HTMLCanvasElement> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(2, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(2, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) {
+    bitmap.close();
+    throw new Error("No se pudo preparar la imagen 360.");
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas;
+}
+
 export class SceneEngine {
   readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
@@ -132,6 +152,13 @@ export class SceneEngine {
   private readonly wall: Mesh;
   private readonly grid: GridHelper;
   private readonly ring: Mesh;
+  private readonly sky: Mesh;
+  private skyTexture: CanvasTexture | null = null;
+  private stayHere = true;
+  private yaw = 0;
+  private pitch = -0.32;
+  private lookX = 0;
+  private lookY = 0;
   private readonly root: Group;
   private videoTexture: CanvasTexture | null = null;
   private videoRevision = -1;
@@ -168,8 +195,9 @@ export class SceneEngine {
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.shadowMap.enabled = false;
 
-    this.camera = new PerspectiveCamera(38, 1, 0.05, 30);
-    this.camera.position.set(0.22, 0.58, 1.38);
+    this.camera = new PerspectiveCamera(50, 1, 0.02, 80);
+    this.camera.rotation.order = "YXZ";
+    this.camera.position.set(0, STUDIO_EYE, 0);
 
     const hemi = new HemisphereLight(0xd5e4ee, 0x1a140f, 0.95);
     const key = new DirectionalLight(0xfff3e4, 2.2);
@@ -222,6 +250,14 @@ export class SceneEngine {
     this.ring.rotation.x = Math.PI / 2;
     this.ring.visible = false;
 
+    this.sky = new Mesh(
+      new SphereGeometry(1, 32, 18),
+      new MeshBasicMaterial({ color: 0x141b21, side: BackSide }),
+    );
+    this.sky.frustumCulled = false;
+    this.sky.visible = false;
+    this.scene.add(this.sky);
+
     this.world.add(
       hemi,
       key,
@@ -244,28 +280,43 @@ export class SceneEngine {
     this.scene.add(this.root);
 
     this.orbit = new OrbitControls(this.camera, canvas);
-    this.orbit.target.set(0, 0.2, 0);
+    this.orbit.target.set(0, STUDIO_EYE, -0.8);
+    this.orbit.enabled = false;
     this.orbit.enableDamping = false;
-    this.orbit.minDistance = 0.4;
-    this.orbit.maxDistance = 3.4;
-    this.orbit.maxPolarAngle = Math.PI * 0.49;
-    this.orbit.update();
+    this.orbit.minDistance = 0.2;
+    this.orbit.maxDistance = 8;
+    this.orbit.maxPolarAngle = Math.PI * 0.92;
+    this.applyLook();
 
     this.controls = new TransformControls(this.camera, canvas);
     this.controls.size = 0.75;
     this.scene.add(this.controls.getHelper());
     this.controls.addEventListener("dragging-changed", (event) => {
       this.gizmoDragging = Boolean(event.value);
-      this.orbit.enabled = !this.gizmoDragging;
+      this.orbit.enabled = !this.gizmoDragging && !this.stayHere;
       if (!this.gizmoDragging) this.emitTransform();
     });
 
     canvas.addEventListener("pointerdown", this.onPointerDown);
+    canvas.addEventListener("pointermove", this.onPointerMove);
     canvas.addEventListener("pointerup", this.onPointerUp);
   }
 
   private onPointerDown = (event: PointerEvent) => {
     this.pointerDown = { x: event.clientX, y: event.clientY, gizmo: this.controls.axis !== null };
+    this.lookX = event.clientX;
+    this.lookY = event.clientY;
+  };
+
+  private onPointerMove = (event: PointerEvent) => {
+    if (!this.stayHere || !this.pointerDown || this.pointerDown.gizmo || this.gizmoDragging) return;
+    if ((event.buttons & 1) === 0) return;
+    const dx = event.clientX - this.lookX;
+    const dy = event.clientY - this.lookY;
+    this.lookX = event.clientX;
+    this.lookY = event.clientY;
+    this.yaw -= dx * 0.005;
+    this.pitch = Math.max(-1.15, Math.min(0.7, this.pitch - dy * 0.004));
   };
 
   private onPointerUp = (event: PointerEvent) => {
@@ -356,6 +407,26 @@ export class SceneEngine {
     }
   }
 
+  async loadPanorama(file: File): Promise<void> {
+    const canvas = await downscaleImage(file, 1536);
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    texture.needsUpdate = true;
+    this.skyTexture?.dispose();
+    this.skyTexture = texture;
+  }
+
+  clearPanorama(): void {
+    this.skyTexture?.dispose();
+    this.skyTexture = null;
+    const material = this.sky.material as MeshBasicMaterial;
+    material.map = null;
+    material.color.setHex(0x141b21);
+    material.needsUpdate = true;
+    this.sky.visible = false;
+    this.wall.visible = true;
+  }
+
   frame(view: FrameView): void {
     this.layout(view.space, view.showSpace);
     if (view.objects !== this.objectRef) {
@@ -375,19 +446,57 @@ export class SceneEngine {
     this.applySelection(view.selectedId);
     this.paintHover(view.hoveredId);
     this.mountVideo(view.videoCanvas, view.showVideo, view.videoRevision);
-    this.orbit.update();
+    this.placeSky(view.panorama);
+    if (view.stayHere) {
+      this.stayHere = true;
+      this.orbit.enabled = false;
+      this.applyLook();
+    } else {
+      if (this.stayHere) this.releaseLook();
+      this.stayHere = false;
+      if (!this.gizmoDragging) this.orbit.enabled = true;
+      this.orbit.update();
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
   dispose(): void {
     this.renderer.domElement.removeEventListener("pointerdown", this.onPointerDown);
+    this.renderer.domElement.removeEventListener("pointermove", this.onPointerMove);
     this.renderer.domElement.removeEventListener("pointerup", this.onPointerUp);
     this.controls.disconnect();
     this.controls.dispose();
     this.orbit.dispose();
     this.videoTexture?.dispose();
+    this.skyTexture?.dispose();
     for (const node of this.nodes.values()) this.disposeNode(node);
     this.renderer.dispose();
+  }
+
+  private applyLook(): void {
+    this.camera.position.set(0, STUDIO_EYE, this.floor.position.z);
+    this.camera.rotation.set(this.pitch, this.yaw, 0);
+  }
+
+  private releaseLook(): void {
+    const forward = new Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    this.orbit.target.copy(this.camera.position).addScaledVector(forward, 0.8);
+  }
+
+  private placeSky(panorama: PanoramaSettings | null): void {
+    const show = Boolean(panorama && this.skyTexture);
+    this.sky.visible = show;
+    this.wall.visible = !show;
+    if (!panorama || !show) return;
+    this.sky.position.set(panorama.position[0], panorama.position[1], panorama.position[2]);
+    this.sky.scale.setScalar(Math.max(1.2, panorama.scale));
+    this.sky.rotation.y = (panorama.rotation * Math.PI) / 180;
+    const material = this.sky.material as MeshBasicMaterial;
+    if (material.map !== this.skyTexture) {
+      material.map = this.skyTexture;
+      material.color.setHex(0xffffff);
+      material.needsUpdate = true;
+    }
   }
 
   private velocityOf(id: string): Vector3 {

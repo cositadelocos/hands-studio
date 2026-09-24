@@ -9,6 +9,7 @@ import { downloadBlob, makeSample, SessionRecorder } from "@/studio/recorder";
 import { SceneEngine, type FrameView } from "@/studio/scene-engine";
 import { useLive, useStudio, type HandHud, type StudioState } from "@/studio/store";
 import type { Side, StudioHand } from "@/studio/types";
+import { STUDIO_EYE } from "@/studio/types";
 
 const DEMO_CUBE: Vec3 = [-0.18, 0.06, 0.02];
 
@@ -48,6 +49,8 @@ function viewFrom(studio: StudioState, extra: Partial<FrameView> = {}): FrameVie
     rays: {},
     moves: [],
     hoveredId: null,
+    stayHere: studio.stayHere,
+    panorama: studio.panorama,
     ...extra,
   };
 }
@@ -172,6 +175,25 @@ export function startRuntime(
     }
     if (command.type === "snapshot") {
       snapshotNext = true;
+      return;
+    }
+    if (command.type === "panorama-clear") {
+      engine.clearPanorama();
+      useStudio.getState().setPanorama(null);
+      useLive.getState().setNotice("Imagen 360 quitada.");
+      return;
+    }
+    if (command.type === "panorama") {
+      await engine.loadPanorama(command.file);
+      const space = useStudio.getState().space;
+      useStudio.getState().setPanorama({
+        name: command.file.name,
+        position: [0, STUDIO_EYE, space.offsetZ],
+        scale: 6,
+        rotation: 0,
+      });
+      useStudio.getState().patch({ stayHere: true });
+      useLive.getState().setNotice("Imagen 360 lista. Estás en el centro.");
       return;
     }
     const object = await engine.importModel(command.file);

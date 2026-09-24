@@ -3,7 +3,9 @@ export type StudioCommand =
   | { type: "flip-camera" }
   | { type: "record-toggle" }
   | { type: "snapshot" }
-  | { type: "import"; file: File };
+  | { type: "import"; file: File }
+  | { type: "panorama"; file: File }
+  | { type: "panorama-clear" };
 
 const queue: StudioCommand[] = [];
 
