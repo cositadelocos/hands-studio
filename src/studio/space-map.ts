@@ -1,11 +1,15 @@
 import { clamp, lerp } from "@/studio/math";
 import type { Vec3 } from "@/studio/math";
-import type { InteractionSpace, NormPoint } from "@/studio/types";
+import { TABLE_Z, type InteractionSpace, type NormPoint } from "@/studio/types";
 
 const SPAN_NEAR = 0.035;
 const SPAN_RANGE = 0.16;
-/** Image y that sits on the table. Higher puts a centered hand farther above the floor. */
-const WRIST_Y = 1.12;
+/** Hands stay in front of the camera, in a band you can see head-on. */
+const HAND_HALF_X = 0.72;
+const HAND_Y_CENTER = 1.02;
+const HAND_Y_SPAN = 0.85;
+const HAND_Z_NEAR = -0.34;
+const HAND_Z_FAR = TABLE_Z + 0.2;
 
 export function palmSpan(image: NormPoint[]): number {
   const wrist = image[0];
@@ -14,19 +18,20 @@ export function palmSpan(image: NormPoint[]): number {
   return Math.hypot(wrist.x - middle.x, wrist.y - middle.y);
 }
 
-/** Image wrist + apparent size → a point inside the interaction volume. */
-export function mapWrist(image: NormPoint, span: number, space: InteractionSpace): Vec3 {
+/** Image wrist + apparent size → a point in front of the viewpoint. */
+export function mapWrist(image: NormPoint, span: number, _space: InteractionSpace): Vec3 {
   const closeness = closenessFromSpan(span);
-  const back = space.offsetZ - space.depth * 0.5;
-  const front = space.offsetZ + space.depth * 0.5;
-  const z = lerp(back, front, closeness);
-  return [(image.x - 0.5) * space.width, (WRIST_Y - image.y) * space.height, z];
+  return [
+    (image.x - 0.5) * HAND_HALF_X * 2,
+    HAND_Y_CENTER + (0.42 - image.y) * HAND_Y_SPAN,
+    lerp(HAND_Z_FAR, HAND_Z_NEAR, closeness),
+  ];
 }
 
-export function wristToImage(wrist: Vec3, space: InteractionSpace): { x: number; y: number } {
+export function wristToImage(wrist: Vec3, _space: InteractionSpace): { x: number; y: number } {
   return {
-    x: wrist[0] / space.width + 0.5,
-    y: WRIST_Y - wrist[1] / space.height,
+    x: wrist[0] / (HAND_HALF_X * 2) + 0.5,
+    y: 0.42 - (wrist[1] - HAND_Y_CENTER) / HAND_Y_SPAN,
   };
 }
 
@@ -35,10 +40,9 @@ export function closenessFromSpan(span: number): number {
 }
 
 /** Inverse of mapWrist's depth term, so the demo can place a hand at a chosen Z. */
-export function spanForDepth(z: number, space: InteractionSpace): number {
-  const back = space.offsetZ - space.depth * 0.5;
-  const front = space.offsetZ + space.depth * 0.5;
-  const closeness = clamp((z - back) / (front - back || 1), 0, 1);
+export function spanForDepth(z: number, _space: InteractionSpace): number {
+  const span = HAND_Z_NEAR - HAND_Z_FAR || 1;
+  const closeness = clamp((z - HAND_Z_FAR) / span, 0, 1);
   return SPAN_NEAR + closeness * SPAN_RANGE;
 }
 

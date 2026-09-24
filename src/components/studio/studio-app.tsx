@@ -7,10 +7,25 @@ export function StudioApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const [sheet, setSheet] = useState<"controls" | "inspector" | null>(null);
   const showOverlay = useStudio((state) => state.showOverlay);
   const camera = useLive((state) => state.camera);
   const recording = useLive((state) => state.recording);
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === stageRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  function toggleStage() {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (document.fullscreenElement === stage) void document.exitFullscreen();
+    else void stage.requestFullscreen();
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -72,10 +87,17 @@ export function StudioApp() {
         <aside className="hidden w-72 shrink-0 border-r border-border bg-surface lg:block">
           <LeftPanel />
         </aside>
-        <main className="relative min-w-0 flex-1">
+        <main ref={stageRef} className="relative min-w-0 flex-1 bg-bg [&:fullscreen]:h-screen [&:fullscreen]:w-screen">
           <canvas ref={canvasRef} className="h-full w-full touch-none" />
           <video ref={videoRef} playsInline muted autoPlay className="pointer-events-none absolute h-px w-px opacity-0" />
           <div className="pointer-events-none absolute inset-0">
+            <button
+              type="button"
+              onClick={toggleStage}
+              className="pointer-events-auto absolute right-3 top-16 min-h-11 rounded-md border border-border bg-surface/90 px-3 text-sm text-fg sm:top-3"
+            >
+              {fullscreen ? "Salir" : "Pantalla completa"}
+            </button>
             <div className="pointer-events-auto absolute left-1/2 top-3 w-52 -translate-x-1/2 sm:w-64">
               <ModeSwitch />
               <p className="mt-1 text-center font-mono text-xs text-muted">1 mover · 2 rotar · 3 escalar</p>
