@@ -139,6 +139,13 @@ async function skyTexture(file: File): Promise<Texture> {
   return texture;
 }
 
+function uprightSphere(): SphereGeometry {
+  const geometry = new SphereGeometry(16, 64, 32);
+  const uv = geometry.getAttribute("uv");
+  for (let index = 0; index < uv.count; index += 1) uv.setY(index, 1 - uv.getY(index));
+  return geometry;
+}
+
 export class SceneEngine {
   readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
@@ -279,10 +286,7 @@ export class SceneEngine {
     this.ring.rotation.x = Math.PI / 2;
     this.ring.visible = false;
     this.scene.add(this.room);
-    this.photo = new Mesh(
-      new SphereGeometry(16, 64, 32),
-      new MeshBasicMaterial({ color: 0xffffff, side: BackSide }),
-    );
+    this.photo = new Mesh(uprightSphere(), new MeshBasicMaterial({ color: 0xffffff, side: BackSide }));
     this.photo.frustumCulled = false;
     this.photo.visible = false;
     this.scene.add(this.photo);
