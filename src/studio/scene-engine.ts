@@ -273,7 +273,7 @@ export class SceneEngine {
     this.orbit.enabled = false;
     this.orbit.enableDamping = false;
     this.orbit.minDistance = 0.2;
-    this.orbit.maxDistance = 8;
+    this.orbit.maxDistance = 14;
     this.orbit.maxPolarAngle = Math.PI * 0.92;
     this.applyLook(STUDIO_EYE);
 
@@ -429,7 +429,7 @@ export class SceneEngine {
       const size = bounds.getSize(new Vector3());
       model.position.sub(center);
       const longest = Math.max(size.x, size.y, size.z, 1e-4);
-      this.roomFit = 5 / longest;
+      this.roomFit = 9 / longest;
       this.room.add(model);
       this.roomModel = model;
     } finally {

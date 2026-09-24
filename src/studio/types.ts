@@ -132,9 +132,9 @@ export const HAND_BONES: ReadonlyArray<readonly [number, number]> = [
 ];
 
 export const DEFAULT_SPACE: InteractionSpace = {
-  width: 2.8,
-  height: 1.7,
-  depth: 2.2,
+  width: 5.2,
+  height: 2.8,
+  depth: 4.4,
   offsetZ: 0,
 };
 
@@ -142,8 +142,8 @@ export const DEFAULT_SPACE: InteractionSpace = {
 export const STUDIO_EYE = 1.25;
 
 export const TABLE_TOP = 0.74;
-export const TABLE_WIDTH = 2.4;
-export const TABLE_DEPTH = 2;
+export const TABLE_WIDTH = 1.7;
+export const TABLE_DEPTH = 1.2;
 
 export interface PanoramaSettings {
   name: string;

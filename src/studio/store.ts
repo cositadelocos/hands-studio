@@ -136,7 +136,7 @@ function spreadObjects(objects: SceneObject[]): SceneObject[] {
 function savedSpace(): InteractionSpace {
   const space = saved?.space;
   if (!space) return DEFAULT_SPACE;
-  if (space.width < 1.8 || space.depth < 1.2) return DEFAULT_SPACE;
+  if (space.width < 4.6 || space.depth < 3.6) return DEFAULT_SPACE;
   return space;
 }
 

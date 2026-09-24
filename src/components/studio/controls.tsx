@@ -137,8 +137,8 @@ export function LeftPanel() {
         <Section title="ESPACIO">
           <Slider
             label="Ancho"
-            min={0.8}
-            max={4}
+            min={1.2}
+            max={8}
             step={0.01}
             value={studio.space.width}
             display={formatMeters(studio.space.width)}
@@ -146,8 +146,8 @@ export function LeftPanel() {
           />
           <Slider
             label="Alto"
-            min={0.6}
-            max={3}
+            min={1}
+            max={5}
             step={0.01}
             value={studio.space.height}
             display={formatMeters(studio.space.height)}
@@ -155,8 +155,8 @@ export function LeftPanel() {
           />
           <Slider
             label="Profundidad"
-            min={0.6}
-            max={4}
+            min={1}
+            max={8}
             step={0.01}
             value={studio.space.depth}
             display={formatMeters(studio.space.depth)}
