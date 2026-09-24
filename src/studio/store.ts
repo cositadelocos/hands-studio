@@ -9,6 +9,7 @@ import {
   type PanoramaSettings,
   type SceneObject,
   type Side,
+  type SkyImage,
   type TransformMode,
 } from "@/studio/types";
 
@@ -158,6 +159,7 @@ export interface StudioState {
   demoDrive: boolean;
   stayHere: boolean;
   panorama: PanoramaSettings | null;
+  sky: SkyImage | null;
   objects: SceneObject[];
   selectedId: string | null;
   setSpace: (patch: Partial<InteractionSpace>) => void;
@@ -170,6 +172,8 @@ export interface StudioState {
   addObject: (object: SceneObject) => void;
   setPanorama: (panorama: PanoramaSettings | null) => void;
   patchPanorama: (patch: Partial<PanoramaSettings>) => void;
+  setSky: (sky: SkyImage | null) => void;
+  patchSky: (patch: Partial<SkyImage>) => void;
   removeSelected: () => void;
   resetObjects: () => void;
   parkDemoCube: () => void;
@@ -214,6 +218,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   demoDrive: saved?.demoDrive ?? true,
   stayHere: true,
   panorama: null,
+  sky: null,
   objects: saved?.objects?.length ? spreadObjects(saved.objects) : defaultObjects(),
   selectedId: null,
   setSpace: (patch) => set((state) => ({ space: { ...state.space, ...patch } })),
@@ -251,6 +256,8 @@ export const useStudio = create<StudioState>((set, get) => ({
   setPanorama: (panorama) => set({ panorama }),
   patchPanorama: (patch) =>
     set((state) => ({ panorama: state.panorama ? { ...state.panorama, ...patch } : null })),
+  setSky: (sky) => set({ sky }),
+  patchSky: (patch) => set((state) => ({ sky: state.sky ? { ...state.sky, ...patch } : null })),
   removeSelected: () =>
     set((state) => ({
       objects: state.objects.filter((object) => object.id !== state.selectedId),

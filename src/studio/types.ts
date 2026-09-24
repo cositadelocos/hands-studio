@@ -154,4 +154,9 @@ export interface PanoramaSettings {
   rotation: number;
 }
 
+export interface SkyImage {
+  name: string;
+  rotation: number;
+}
+
 export const OBJECT_COLORS = ["#e59a4a", "#3dbeb6", "#e07a5f"] as const;

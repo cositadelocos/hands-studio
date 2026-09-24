@@ -1,5 +1,6 @@
 import {
   AxesHelper,
+  BackSide,
   Box3,
   BoxGeometry,
   BufferAttribute,
@@ -36,7 +37,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { Vec3 } from "@/studio/math";
-import { HAND_BONES, STUDIO_EYE, TABLE_DEPTH, TABLE_TOP, TABLE_WIDTH, TABLE_Z, type InteractionSpace, type PanoramaSettings, type SceneObject, type Side, type TransformMode } from "@/studio/types";
+import { HAND_BONES, STUDIO_EYE, TABLE_DEPTH, TABLE_TOP, TABLE_WIDTH, TABLE_Z, type InteractionSpace, type PanoramaSettings, type SceneObject, type Side, type SkyImage, type TransformMode } from "@/studio/types";
 import type { RayHit } from "@/studio/interaction";
 
 export interface HandView {
@@ -75,6 +76,7 @@ export interface FrameView {
   stayHere: boolean;
   eyeHeight: number;
   panorama: PanoramaSettings | null;
+  sky: SkyImage | null;
 }
 
 const LEFT = 0x3dbeb6;
@@ -110,6 +112,22 @@ function writeSegment(line: LineSegments, a: Vec3, b: Vec3): void {
   attribute.needsUpdate = true;
 }
 
+async function downscaleImage(file: File, maxEdge: number): Promise<HTMLCanvasElement> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(2, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(2, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) {
+    bitmap.close();
+    throw new Error("No se pudo preparar la imagen 360.");
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas;
+}
+
 export class SceneEngine {
   readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
@@ -142,6 +160,8 @@ export class SceneEngine {
   private readonly room = new Group();
   private roomModel: Group | null = null;
   private roomFit = 1;
+  private readonly photo: Mesh;
+  private photoTexture: CanvasTexture | null = null;
   private stayHere = true;
   private yaw = 0;
   private pitch = -0.42;
@@ -248,6 +268,13 @@ export class SceneEngine {
     this.ring.rotation.x = Math.PI / 2;
     this.ring.visible = false;
     this.scene.add(this.room);
+    this.photo = new Mesh(
+      new SphereGeometry(16, 24, 16),
+      new MeshBasicMaterial({ color: 0xffffff, side: BackSide }),
+    );
+    this.photo.frustumCulled = false;
+    this.photo.visible = false;
+    this.scene.add(this.photo);
 
     this.world.add(
       hemi,
@@ -440,6 +467,27 @@ export class SceneEngine {
     }
   }
 
+  async loadSky(file: File): Promise<void> {
+    const canvas = await downscaleImage(file, 1280);
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    texture.needsUpdate = true;
+    this.photoTexture?.dispose();
+    this.photoTexture = texture;
+    const material = this.photo.material as MeshBasicMaterial;
+    material.map = texture;
+    material.needsUpdate = true;
+  }
+
+  clearSky(): void {
+    this.photoTexture?.dispose();
+    this.photoTexture = null;
+    const material = this.photo.material as MeshBasicMaterial;
+    material.map = null;
+    material.needsUpdate = true;
+    this.photo.visible = false;
+  }
+
   clearPanorama(): void {
     this.clearRoomModel();
     this.room.visible = false;
@@ -499,6 +547,8 @@ export class SceneEngine {
       if (!this.gizmoDragging) this.orbit.enabled = true;
       this.orbit.update();
     }
+    this.placePhoto(view.sky);
+    if (this.photo.visible) this.room.visible = false;
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -510,6 +560,7 @@ export class SceneEngine {
     this.controls.dispose();
     this.orbit.dispose();
     this.videoTexture?.dispose();
+    this.photoTexture?.dispose();
     this.clearRoomModel();
     for (const node of this.nodes.values()) this.disposeNode(node);
     this.renderer.dispose();
@@ -526,7 +577,8 @@ export class SceneEngine {
   }
 
   private placeSky(panorama: PanoramaSettings | null): void {
-    const show = Boolean(panorama && this.roomModel);
+    const photoOn = this.photo.visible;
+    const show = Boolean(panorama && this.roomModel && !photoOn);
     this.room.visible = show;
     this.wall.visible = false;
     this.floor.visible = false;
@@ -534,6 +586,15 @@ export class SceneEngine {
     this.room.position.set(panorama.position[0], panorama.position[1], panorama.position[2]);
     this.room.scale.setScalar(Math.max(0.01, panorama.scale) * this.roomFit);
     this.room.rotation.y = (panorama.rotation * Math.PI) / 180;
+  }
+
+  private placePhoto(sky: SkyImage | null): void {
+    const show = Boolean(sky && this.photoTexture);
+    this.photo.visible = show;
+    if (!sky || !show) return;
+    this.photo.position.copy(this.camera.position);
+    this.photo.rotation.y = (sky.rotation * Math.PI) / 180;
+    this.room.visible = false;
   }
 
   private clearRoomModel(): void {

@@ -73,6 +73,7 @@ export function LeftPanel() {
   const recording = useLive((state) => state.recording);
   const fileRef = useRef<HTMLInputElement>(null);
   const panoramaRef = useRef<HTMLInputElement>(null);
+  const skyRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="flex h-full flex-col">
@@ -318,6 +319,52 @@ export function LeftPanel() {
             </>
           ) : (
             <p className="mt-2 text-sm text-muted">Sube el GLB y quedas dentro, en el centro del modelo.</p>
+          )}
+        </Section>
+
+        <Section title="IMAGEN 360">
+          <button
+            type="button"
+            className="min-h-11 w-full rounded-md border border-border bg-surface-2 text-sm text-fg"
+            onClick={() => skyRef.current?.click()}
+          >
+            Cargar imagen 360
+          </button>
+          <input
+            ref={skyRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) pushCommand({ type: "sky", file });
+            }}
+          />
+          {studio.sky ? (
+            <>
+              <p className="mt-2 truncate text-sm text-muted">{studio.sky.name}</p>
+              <Slider
+                label="Rotación"
+                min={-180}
+                max={180}
+                step={1}
+                value={studio.sky.rotation}
+                display={`${Math.round(studio.sky.rotation)} °`}
+                onChange={(rotation) => studio.patchSky({ rotation })}
+              />
+              <button
+                type="button"
+                className="mt-3 min-h-11 w-full rounded-md border border-border text-sm text-muted"
+                onClick={() => pushCommand({ type: "sky-clear" })}
+              >
+                Quitar imagen
+              </button>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted">
+              Quedas dentro de la foto, como en Maps. Arrastra para mirar alrededor. Mientras está puesta, el GLB se oculta para que vaya más fluido.
+            </p>
           )}
         </Section>
 

@@ -5,7 +5,9 @@ export type StudioCommand =
   | { type: "snapshot" }
   | { type: "import"; file: File }
   | { type: "panorama"; file: File }
-  | { type: "panorama-clear" };
+  | { type: "panorama-clear" }
+  | { type: "sky"; file: File }
+  | { type: "sky-clear" };
 
 const queue: StudioCommand[] = [];
 

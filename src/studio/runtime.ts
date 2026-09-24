@@ -52,6 +52,7 @@ function viewFrom(studio: StudioState, extra: Partial<FrameView> = {}): FrameVie
     stayHere: studio.stayHere,
     eyeHeight: studio.eyeHeight,
     panorama: studio.panorama,
+    sky: studio.sky,
     ...extra,
   };
 }
@@ -201,6 +202,19 @@ export function startRuntime(
       engine.clearPanorama();
       useStudio.getState().setPanorama(null);
       useLive.getState().setNotice("Entorno GLB quitado.");
+      return;
+    }
+    if (command.type === "sky-clear") {
+      engine.clearSky();
+      useStudio.getState().setSky(null);
+      useLive.getState().setNotice("Imagen 360 quitada.");
+      return;
+    }
+    if (command.type === "sky") {
+      await engine.loadSky(command.file);
+      useStudio.getState().setSky({ name: command.file.name, rotation: 0 });
+      useStudio.getState().patch({ stayHere: true });
+      useLive.getState().setNotice("Imagen 360 lista. Gira la vista para mirar alrededor.");
       return;
     }
     if (command.type === "panorama") {
