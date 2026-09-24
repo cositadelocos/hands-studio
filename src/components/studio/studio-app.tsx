@@ -8,23 +8,47 @@ export function StudioApp() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLElement>(null);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [fill, setFill] = useState(false);
   const [sheet, setSheet] = useState<"controls" | "inspector" | null>(null);
   const showOverlay = useStudio((state) => state.showOverlay);
   const camera = useLive((state) => state.camera);
   const recording = useLive((state) => state.recording);
 
   useEffect(() => {
-    const onChange = () => setFullscreen(document.fullscreenElement === stageRef.current);
+    const onChange = () => {
+      if (!document.fullscreenElement) setFill(false);
+    };
     document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
   }, []);
 
-  function toggleStage() {
+  async function toggleStage() {
     const stage = stageRef.current;
     if (!stage) return;
-    if (document.fullscreenElement === stage) void document.exitFullscreen();
-    else void stage.requestFullscreen();
+    if (document.fullscreenElement === stage || fill) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
+      setFill(false);
+      return;
+    }
+    const webkit = stage as HTMLElement & { webkitRequestFullscreen?: () => void | Promise<void> };
+    const request = stage.requestFullscreen?.bind(stage) ?? webkit.webkitRequestFullscreen?.bind(stage);
+    if (request) {
+      try {
+        const result = request();
+        if (result && typeof result.then === "function") await result;
+        if (document.fullscreenElement === stage) {
+          setFill(true);
+          return;
+        }
+      } catch {
+        // iPhone Safari no permite la pantalla completa nativa.
+      }
+    }
+    setFill(true);
   }
 
   useEffect(() => {
@@ -87,7 +111,10 @@ export function StudioApp() {
         <aside className="hidden w-72 shrink-0 border-r border-border bg-surface lg:block">
           <LeftPanel />
         </aside>
-        <main ref={stageRef} className="relative min-w-0 flex-1 bg-bg [&:fullscreen]:h-screen [&:fullscreen]:w-screen">
+        <main
+          ref={stageRef}
+          className={`relative min-w-0 flex-1 bg-bg [&:fullscreen]:h-screen [&:fullscreen]:w-screen ${fill ? "fixed inset-0 z-40 h-dvh w-screen" : ""}`}
+        >
           <canvas ref={canvasRef} className="h-full w-full touch-none" />
           <video ref={videoRef} playsInline muted autoPlay className="pointer-events-none absolute h-px w-px opacity-0" />
           <div className="pointer-events-none absolute inset-0">
@@ -96,11 +123,11 @@ export function StudioApp() {
               onClick={toggleStage}
               className="pointer-events-auto absolute right-3 top-16 min-h-11 rounded-md border border-border bg-surface/90 px-3 text-sm text-fg sm:top-3"
             >
-              {fullscreen ? "Salir" : "Pantalla completa"}
+              {fill ? "Salir" : "Pantalla completa"}
             </button>
             <div className="pointer-events-auto absolute left-1/2 top-3 w-52 -translate-x-1/2 sm:w-64">
               <ModeSwitch />
-              <p className="mt-1 text-center font-mono text-xs text-muted">1 mover · 2 rotar · 3 escalar</p>
+              <p className="mt-1 text-center font-mono text-xs text-muted">el objeto seleccionado</p>
             </div>
             <div className="absolute left-3 top-16 flex flex-col gap-1 text-xs sm:top-3">
               <span className="text-sm font-semibold tracking-tight text-fg sm:hidden">cositadelocos</span>
