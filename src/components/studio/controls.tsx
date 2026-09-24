@@ -112,8 +112,17 @@ export function LeftPanel() {
           <Toggle label="Invertir izquierda / derecha" on={studio.invertHands} onClick={() => studio.patch({ invertHands: !studio.invertHands })} />
           <Toggle label="Quedarme aquí" on={studio.stayHere} onClick={() => studio.patch({ stayHere: !studio.stayHere })} />
           <p className="mt-2 text-sm text-muted">
-            La cámara se queda en el centro de la mesa. Arrastra el visor para girar sin salir del lugar.
+            La cámara se queda en el centro. Arrastra el visor para girar sin salir del lugar.
           </p>
+          <Slider
+            label="Altura de la vista"
+            min={0.5}
+            max={2.6}
+            step={0.01}
+            value={studio.eyeHeight}
+            display={formatMeters(studio.eyeHeight)}
+            onChange={(eyeHeight) => studio.patch({ eyeHeight })}
+          />
         </Section>
 
         <Section title="VISUAL">

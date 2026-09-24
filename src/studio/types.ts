@@ -139,7 +139,11 @@ export const DEFAULT_SPACE: InteractionSpace = {
 };
 
 /** Eye height at the middle of the table. */
-export const STUDIO_EYE = 0.46;
+export const STUDIO_EYE = 1.25;
+
+export const TABLE_TOP = 0.74;
+export const TABLE_WIDTH = 2.4;
+export const TABLE_DEPTH = 2;
 
 export interface PanoramaSettings {
   name: string;

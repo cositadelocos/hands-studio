@@ -11,7 +11,7 @@ import { useLive, useStudio, type HandHud, type StudioState } from "@/studio/sto
 import type { Side, StudioHand } from "@/studio/types";
 import { STUDIO_EYE } from "@/studio/types";
 
-const DEMO_CUBE: Vec3 = [-0.7, 0.06, 0.55];
+const DEMO_CUBE: Vec3 = [-0.55, 0.8, 0.25];
 
 import { KEY_ANCHOR_IDS, palmRotation } from "@/studio/anchors";
 
@@ -50,6 +50,7 @@ function viewFrom(studio: StudioState, extra: Partial<FrameView> = {}): FrameVie
     moves: [],
     hoveredId: null,
     stayHere: studio.stayHere,
+    eyeHeight: studio.eyeHeight,
     panorama: studio.panorama,
     ...extra,
   };

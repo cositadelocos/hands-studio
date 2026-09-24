@@ -8,6 +8,7 @@ import {
   Color,
   CylinderGeometry,
   DirectionalLight,
+  DoubleSide,
   EdgesGeometry,
   GridHelper,
   Group,
@@ -16,6 +17,7 @@ import {
   LineBasicMaterial,
   LineSegments,
   Mesh,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   Object3D,
   PerspectiveCamera,
@@ -33,7 +35,7 @@ import {
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { Vec3 } from "@/studio/math";
-import { HAND_BONES, STUDIO_EYE, type InteractionSpace, type PanoramaSettings, type SceneObject, type Side, type TransformMode } from "@/studio/types";
+import { HAND_BONES, STUDIO_EYE, TABLE_DEPTH, TABLE_TOP, TABLE_WIDTH, type InteractionSpace, type PanoramaSettings, type SceneObject, type Side, type TransformMode } from "@/studio/types";
 import type { RayHit } from "@/studio/interaction";
 
 export interface HandView {
@@ -70,6 +72,7 @@ export interface FrameView {
   moves: { id: string; position: Vec3 }[];
   hoveredId: string | null;
   stayHere: boolean;
+  eyeHeight: number;
   panorama: PanoramaSettings | null;
 }
 
@@ -131,6 +134,7 @@ export class SceneEngine {
   private readonly rightAxes: AxesHelper;
   private readonly volume: LineSegments;
   private readonly floor: Mesh;
+  private readonly table: Mesh;
   private readonly wall: Mesh;
   private readonly grid: GridHelper;
   private readonly ring: Mesh;
@@ -182,17 +186,25 @@ export class SceneEngine {
     this.camera.rotation.order = "YXZ";
     this.camera.position.set(0, STUDIO_EYE, 0);
 
-    const hemi = new HemisphereLight(0xd5e4ee, 0x1a140f, 0.95);
-    const key = new DirectionalLight(0xfff3e4, 2.2);
+    const hemi = new HemisphereLight(0xffffff, 0x8d8278, 1.4);
+    const key = new DirectionalLight(0xfff6ea, 1.2);
     key.position.set(0.9, 2.4, 1.5);
 
     this.floor = new Mesh(new PlaneGeometry(1, 1, 1, 1), new MeshLambertMaterial({ color: 0x1a222a }));
     this.floor.rotation.x = -Math.PI / 2;
+    this.floor.visible = false;
+
+    this.table = new Mesh(
+      new BoxGeometry(TABLE_WIDTH, 0.08, TABLE_DEPTH),
+      new MeshLambertMaterial({ color: 0xc4a574, emissive: 0x4a3724, emissiveIntensity: 0.35 }),
+    );
+    this.table.position.set(0, TABLE_TOP - 0.04, 0);
 
     this.wall = new Mesh(new PlaneGeometry(1, 1, 1, 1), new MeshLambertMaterial({ color: 0x141b21 }));
+    this.wall.visible = false;
 
-    this.grid = new GridHelper(1.2, 6, 0x3c4a55, 0x243038);
-    this.grid.position.y = 0.003;
+    this.grid = new GridHelper(1.2, 6, 0x6b5844, 0x3d342c);
+    this.grid.position.y = TABLE_TOP + 0.002;
 
     this.volume = new LineSegments(
       new EdgesGeometry(new BoxGeometry(1, 1, 1)),
@@ -238,6 +250,7 @@ export class SceneEngine {
       hemi,
       key,
       this.floor,
+      this.table,
       this.wall,
       this.grid,
       this.volume,
@@ -262,7 +275,7 @@ export class SceneEngine {
     this.orbit.minDistance = 0.2;
     this.orbit.maxDistance = 8;
     this.orbit.maxPolarAngle = Math.PI * 0.92;
-    this.applyLook();
+    this.applyLook(STUDIO_EYE);
 
     this.controls = new TransformControls(this.camera, canvas);
     this.controls.size = 0.75;
@@ -392,10 +405,23 @@ export class SceneEngine {
       this.clearRoomModel();
       const model = gltf.scene;
       model.traverse((child) => {
-        if (child instanceof Mesh) {
-          child.castShadow = false;
-          child.receiveShadow = false;
-        }
+        if (!(child instanceof Mesh)) return;
+        child.castShadow = false;
+        child.receiveShadow = false;
+        const source = Array.isArray(child.material) ? child.material : [child.material];
+        const unlit = source.map((material) => {
+          const painted = material as Material & { map?: MeshBasicMaterial["map"]; emissiveMap?: MeshBasicMaterial["map"]; color?: Color };
+          const map = painted.map ?? painted.emissiveMap ?? null;
+          const basic = new MeshBasicMaterial({
+            map,
+            color: map ? 0xffffff : (painted.color ?? 0xffffff),
+            side: DoubleSide,
+          });
+          basic.toneMapped = false;
+          material.dispose();
+          return basic;
+        });
+        child.material = unlit.length === 1 ? unlit[0]! : unlit;
       });
       model.updateMatrixWorld(true);
       const bounds = new Box3().setFromObject(model);
@@ -414,7 +440,7 @@ export class SceneEngine {
   clearPanorama(): void {
     this.clearRoomModel();
     this.room.visible = false;
-    this.wall.visible = true;
+    this.wall.visible = false;
   }
 
   frame(view: FrameView): void {
@@ -440,7 +466,7 @@ export class SceneEngine {
     if (view.stayHere) {
       this.stayHere = true;
       this.orbit.enabled = false;
-      this.applyLook();
+      this.applyLook(view.eyeHeight);
     } else {
       if (this.stayHere) this.releaseLook();
       this.stayHere = false;
@@ -463,8 +489,8 @@ export class SceneEngine {
     this.renderer.dispose();
   }
 
-  private applyLook(): void {
-    this.camera.position.set(0, STUDIO_EYE, this.floor.position.z);
+  private applyLook(eye: number): void {
+    this.camera.position.set(0, eye, this.floor.position.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0);
   }
 
@@ -476,7 +502,8 @@ export class SceneEngine {
   private placeSky(panorama: PanoramaSettings | null): void {
     const show = Boolean(panorama && this.roomModel);
     this.room.visible = show;
-    this.wall.visible = !show;
+    this.wall.visible = false;
+    this.floor.visible = false;
     if (!panorama || !show) return;
     this.room.position.set(panorama.position[0], panorama.position[1], panorama.position[2]);
     this.room.scale.setScalar(Math.max(0.01, panorama.scale) * this.roomFit);
@@ -515,7 +542,7 @@ export class SceneEngine {
       previous = node.position.clone();
       this.previous.set(id, previous);
       this.boxA.setFromObject(node);
-      if (this.boxA.min.y <= 0.02) this.sleeping.add(id);
+      if (this.boxA.min.y <= TABLE_TOP + 0.02) this.sleeping.add(id);
     }
     return previous;
   }
@@ -556,8 +583,8 @@ export class SceneEngine {
         const node = this.nodes.get(id);
         if (!node?.visible || held.has(id) || this.sleeping.has(id)) continue;
         this.boxA.setFromObject(node);
-        if (this.boxA.min.y < 0) {
-          node.position.y -= this.boxA.min.y;
+        if (this.boxA.min.y < TABLE_TOP) {
+          node.position.y += TABLE_TOP - this.boxA.min.y;
           const velocity = this.velocityOf(id);
           velocity.y = velocity.y < -0.45 ? -velocity.y * 0.12 : 0;
           velocity.x *= 0.86;
@@ -578,7 +605,7 @@ export class SceneEngine {
       if (!node?.visible) continue;
       const velocity = this.velocityOf(id);
       this.boxA.setFromObject(node);
-      const supported = this.boxA.min.y <= 0.012 || resting.has(id);
+      const supported = this.boxA.min.y <= TABLE_TOP + 0.02 || resting.has(id);
       if (supported && velocity.length() < 0.06) {
         velocity.set(0, 0, 0);
         this.sleeping.add(id);
@@ -588,9 +615,9 @@ export class SceneEngine {
   }
 
   private keepOnTable(): void {
-    const maxX = this.floor.scale.x * 0.5;
-    const maxZ = this.floor.scale.y * 0.5;
-    const z0 = this.floor.position.z;
+    const maxX = TABLE_WIDTH * 0.5;
+    const maxZ = TABLE_DEPTH * 0.5;
+    const z0 = 0;
     for (const [id, node] of this.nodes) {
       if (!node.visible) continue;
       this.boxA.setFromObject(node);
@@ -601,7 +628,7 @@ export class SceneEngine {
       else if (this.boxA.min.x < -maxX) dx = -maxX - this.boxA.min.x;
       if (this.boxA.max.z > z0 + maxZ) dz = z0 + maxZ - this.boxA.max.z;
       else if (this.boxA.min.z < z0 - maxZ) dz = z0 - maxZ - this.boxA.min.z;
-      if (this.boxA.min.y < 0) dy = -this.boxA.min.y;
+      if (this.boxA.min.y < TABLE_TOP) dy = TABLE_TOP - this.boxA.min.y;
       if (!dx && !dy && !dz) continue;
       node.position.x += dx;
       node.position.y += dy;
@@ -702,10 +729,11 @@ export class SceneEngine {
       this.spaceKey = key;
       this.floor.scale.set(space.width, space.depth, 1);
       this.floor.position.set(0, 0, space.offsetZ);
+      this.table.position.set(0, TABLE_TOP - 0.04, space.offsetZ);
       this.wall.scale.set(space.width, space.height, 1);
       this.wall.position.set(0, space.height / 2, space.offsetZ - space.depth / 2 - 0.012);
-      this.grid.scale.set(space.width / 1.2, 1, space.depth / 1.2);
-      this.grid.position.set(0, 0.003, space.offsetZ);
+      this.grid.scale.set(TABLE_WIDTH / 1.2, 1, TABLE_DEPTH / 1.2);
+      this.grid.position.set(0, TABLE_TOP + 0.002, space.offsetZ);
       this.volume.geometry.dispose();
       this.volume.geometry = new EdgesGeometry(new BoxGeometry(space.width, space.height, space.depth));
       this.volume.position.set(0, space.height / 2, space.offsetZ);

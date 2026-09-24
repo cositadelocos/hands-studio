@@ -3,6 +3,7 @@ import type { Vec3 } from "@/studio/math";
 import {
   DEFAULT_SPACE,
   OBJECT_COLORS,
+  TABLE_TOP,
   type InteractionSpace,
   type PanoramaSettings,
   type SceneObject,
@@ -56,6 +57,7 @@ interface Persisted {
   showOverlay: boolean;
   debug: boolean;
   invertHands: boolean;
+  eyeHeight: number;
   transformMode: TransformMode;
   demoDrive: boolean;
   objects: SceneObject[];
@@ -67,7 +69,7 @@ function defaultObjects(): SceneObject[] {
       id: "cube-demo",
       name: "Cubo",
       kind: "box",
-      position: [-0.7, 0.06, 0.55],
+      position: [-0.55, 0.8, 0.25],
       rotation: [0, 0.4, 0],
       scale: [0.12, 0.12, 0.12],
       visible: true,
@@ -79,7 +81,7 @@ function defaultObjects(): SceneObject[] {
       id: "sphere-demo",
       name: "Esfera",
       kind: "sphere",
-      position: [0.75, 0.07, 0.35],
+      position: [0.6, 0.81, -0.15],
       rotation: [0, 0, 0],
       scale: [0.14, 0.14, 0.14],
       visible: true,
@@ -91,7 +93,7 @@ function defaultObjects(): SceneObject[] {
       id: "torus-demo",
       name: "Toro",
       kind: "torus",
-      position: [0.05, 0.05, 0.9],
+      position: [0.05, 0.78, 0.55],
       rotation: [Math.PI / 2, 0, 0.25],
       scale: [0.2, 0.2, 0.2],
       visible: true,
@@ -119,15 +121,14 @@ const saved = loadPersisted();
 
 function spreadObjects(objects: SceneObject[]): SceneObject[] {
   const parked: Record<string, Vec3> = {
-    "cube-demo": [-0.7, 0.06, 0.55],
-    "sphere-demo": [0.75, 0.07, 0.35],
-    "torus-demo": [0.05, 0.05, 0.9],
+    "cube-demo": [-0.55, 0.8, 0.25],
+    "sphere-demo": [0.6, 0.81, -0.15],
+    "torus-demo": [0.05, 0.78, 0.55],
   };
   return objects.map((object) => {
     const next = parked[object.id];
     if (!next) return object;
-    const [x, , z] = object.position;
-    if (x * x + z * z > 0.36) return object;
+    if (object.position[1] >= 0.5) return object;
     return { ...object, position: next };
   });
 }
@@ -151,6 +152,7 @@ export interface StudioState {
   showOverlay: boolean;
   debug: boolean;
   invertHands: boolean;
+  eyeHeight: number;
   transformMode: TransformMode;
   demoDrive: boolean;
   stayHere: boolean;
@@ -186,6 +188,7 @@ function persist(state: StudioState): void {
     showOverlay: state.showOverlay,
     debug: state.debug,
     invertHands: state.invertHands,
+    eyeHeight: state.eyeHeight,
     transformMode: state.transformMode,
     demoDrive: state.demoDrive,
     objects: state.objects.filter((object) => object.kind !== "model"),
@@ -205,6 +208,7 @@ export const useStudio = create<StudioState>((set, get) => ({
   showOverlay: saved?.showOverlay ?? true,
   debug: saved?.debug ?? true,
   invertHands: saved?.invertHands ?? false,
+  eyeHeight: saved?.eyeHeight ?? 1.25,
   transformMode: saved?.transformMode ?? "translate",
   demoDrive: saved?.demoDrive ?? true,
   stayHere: true,
@@ -227,7 +231,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     set((state) => {
       const index = state.objects.length;
       const scale = kind === "sphere" ? 0.14 : kind === "torus" ? 0.2 : kind === "cylinder" ? 0.14 : 0.12;
-      const y = kind === "torus" ? 0.045 : scale * 0.5;
+      const y = TABLE_TOP + (kind === "torus" ? 0.04 : scale * 0.5);
       const object: SceneObject = {
         id: `${kind}-${crypto.randomUUID().slice(0, 6)}`,
         name: kind === "box" ? "Cubo" : kind === "sphere" ? "Esfera" : kind === "torus" ? "Toro" : "Cilindro",
@@ -256,7 +260,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     set((state) => ({
       objects: state.objects.map((object) =>
         object.id === "cube-demo"
-          ? { ...object, position: [-0.7, 0.06, 0.55], rotation: [0, 0.4, 0], scale: [0.12, 0.12, 0.12] }
+          ? { ...object, position: [-0.55, 0.8, 0.25], rotation: [0, 0.4, 0], scale: [0.12, 0.12, 0.12] }
           : object,
       ),
     })),

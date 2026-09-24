@@ -164,7 +164,7 @@ function toRaw(side: Side, pose: Pose, space: InteractionSpace): RawHand {
   return { handedness: side, score: 0.99, image, world };
 }
 
-export function sampleDemo(timestamp: number, space: InteractionSpace = DEFAULT_SPACE, cube: Vec3 = [-0.7, 0.06, 0.55]): TrackingFrame {
+export function sampleDemo(timestamp: number, space: InteractionSpace = DEFAULT_SPACE, cube: Vec3 = [-0.55, 0.8, 0.25]): TrackingFrame {
   const poses = demoPoses(timestamp / 1000, cube);
   return {
     timestamp,
