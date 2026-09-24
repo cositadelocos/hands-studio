@@ -19,10 +19,17 @@ function lookPad(kind: "yaw" | "pitch"): HTMLElement | null {
   return document.querySelector(`[data-look="${kind}"]`);
 }
 
+function fingerGap(hand: StudioHand): number {
+  const thumb = hand.image[4];
+  const index = hand.image[8];
+  if (!thumb || !index) return 1;
+  return Math.hypot(thumb.x - index.x, thumb.y - index.y);
+}
+
 function overPad(element: HTMLElement | null, x: number, y: number): boolean {
   if (!element) return false;
   const rect = element.getBoundingClientRect();
-  return x >= rect.left - 36 && x <= rect.right + 36 && y >= rect.top - 36 && y <= rect.bottom + 36;
+  return x >= rect.left - 8 && x <= rect.right + 8 && y >= rect.top - 8 && y <= rect.bottom + 8;
 }
 
 function lookFromPoint(kind: "yaw" | "pitch", x: number, y: number): number | null {
@@ -31,28 +38,36 @@ function lookFromPoint(kind: "yaw" | "pitch", x: number, y: number): number | nu
   const rect = element.getBoundingClientRect();
   if (kind === "yaw") {
     const t = Math.min(1, Math.max(0, (x - rect.left) / (rect.width || 1)));
-    return -22 + t * 44;
+    return -36 + t * 72;
   }
   const t = Math.min(1, Math.max(0, (y - rect.top) / (rect.height || 1)));
-  return 12 - t * 26;
+  return 20 - t * 44;
 }
 
 function steerLook(
   hands: Partial<Record<Side, StudioHand>>,
   engine: SceneEngine,
-  drag: { side: Side | null; axis: "yaw" | "pitch" | null },
+  drag: { side: Side | null; axis: "yaw" | "pitch" | null; wasTight: Partial<Record<Side, boolean>> },
 ): Partial<Record<Side, StudioHand>> {
   const steered = { ...hands };
   let used: Side | null = null;
   for (const side of ["left", "right"] as const) {
     const hand = hands[side];
-    if (!hand?.pinch) continue;
-    const screen = engine.projectToClient(hand.pinchPoint);
-    if (!screen) continue;
-    let axis = drag.side === side ? drag.axis : null;
-    if (!axis && overPad(lookPad("yaw"), screen.x, screen.y)) axis = "yaw";
-    else if (!axis && overPad(lookPad("pitch"), screen.x, screen.y)) axis = "pitch";
-    if (!axis) continue;
+    if (!hand) {
+      drag.wasTight[side] = false;
+      continue;
+    }
+    const gap = fingerGap(hand);
+    const tight = gap < 0.05;
+    const screen = tight || drag.side === side ? engine.projectToClient(hand.pinchPoint) : null;
+    const holding = drag.side === side && drag.axis && gap < 0.075;
+    let axis = holding ? drag.axis : null;
+    if (!axis && tight && !drag.wasTight[side] && screen) {
+      if (overPad(lookPad("yaw"), screen.x, screen.y)) axis = "yaw";
+      else if (overPad(lookPad("pitch"), screen.x, screen.y)) axis = "pitch";
+    }
+    drag.wasTight[side] = tight;
+    if (!axis || !screen) continue;
     const value = lookFromPoint(axis, screen.x, screen.y);
     if (value === null) continue;
     drag.side = side;
@@ -146,7 +161,11 @@ export function startRuntime(
   const memory = createPipelineMemory();
   const interaction = createInteractionMemory();
   const recorder = new SessionRecorder();
-  const lookDrag: { side: Side | null; axis: "yaw" | "pitch" | null } = { side: null, axis: null };
+  const lookDrag: { side: Side | null; axis: "yaw" | "pitch" | null; wasTight: Partial<Record<Side, boolean>> } = {
+    side: null,
+    axis: null,
+    wasTight: {},
+  };
   let mode: "demo" | "camera" = "demo";
   let cameraToken = 0;
   let frames = 0;

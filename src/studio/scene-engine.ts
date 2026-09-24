@@ -183,6 +183,7 @@ export class SceneEngine {
   private readonly photo: Mesh;
   private photoTexture: Texture | null = null;
   private stayHere = true;
+  private viewAspect = 0;
   private yaw = 0;
   private pitch = -0.42;
   private lookX = 0;
@@ -352,8 +353,8 @@ export class SceneEngine {
     const dy = event.clientY - this.lookY;
     this.lookX = event.clientX;
     this.lookY = event.clientY;
-    const yaw = Math.min(22, Math.max(-22, (this.yaw * 180) / Math.PI - dx * 0.2));
-    const pitch = Math.min(12, Math.max(-14, ((this.pitch + 0.32) * 180) / Math.PI - dy * 0.16));
+    const yaw = Math.min(36, Math.max(-36, (this.yaw * 180) / Math.PI - dx * 0.2));
+    const pitch = Math.min(20, Math.max(-24, ((this.pitch + 0.32) * 180) / Math.PI - dy * 0.16));
     this.onLook?.(yaw, pitch);
   };
 
@@ -367,7 +368,12 @@ export class SceneEngine {
 
   resize(width: number, height: number): void {
     if (width < 2 || height < 2) return;
-    this.camera.aspect = width / height;
+    const aspect = width / height;
+    if (width > 240 && !this.viewAspect) this.viewAspect = aspect;
+    const base = this.viewAspect || aspect;
+    const horizontal = 2 * Math.atan(Math.tan((50 * Math.PI) / 360) * base);
+    this.camera.fov = (2 * Math.atan(Math.tan(horizontal / 2) / aspect) * 180) / Math.PI;
+    this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1));
     this.renderer.setSize(width, height, false);

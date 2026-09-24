@@ -11,17 +11,17 @@ function LookPads() {
     const rect = event.currentTarget.getBoundingClientRect();
     if (axis === "yaw") {
       const t = Math.min(1, Math.max(0, (event.clientX - rect.left) / (rect.width || 1)));
-      patch({ lookYaw: -22 + t * 44 });
+      patch({ lookYaw: -36 + t * 72 });
       return;
     }
     const t = Math.min(1, Math.max(0, (event.clientY - rect.top) / (rect.height || 1)));
-    patch({ lookPitch: 12 - t * 26 });
+    patch({ lookPitch: 20 - t * 44 });
   };
   return (
     <>
       <div
         data-look="yaw"
-        className="pointer-events-auto absolute bottom-4 left-1/2 flex h-12 w-52 -translate-x-1/2 items-center rounded-full border border-border bg-surface/80 px-3 sm:w-64"
+        className="pointer-events-auto absolute bottom-4 left-1/2 flex h-12 w-72 -translate-x-1/2 touch-none items-center rounded-full border border-border bg-surface/80 px-3 sm:w-96"
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
           setFromPointer("yaw", event);
@@ -33,13 +33,13 @@ function LookPads() {
         <span className="pointer-events-none absolute left-3 font-mono text-[10px] text-muted">izq</span>
         <span
           className="pointer-events-none absolute top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-accent"
-          style={{ left: `calc(${((lookYaw + 22) / 44) * 100}% - 12px)` }}
+          style={{ left: `calc(${((lookYaw + 36) / 72) * 100}% - 12px)` }}
         />
         <span className="pointer-events-none absolute right-3 font-mono text-[10px] text-muted">der</span>
       </div>
       <div
         data-look="pitch"
-        className="pointer-events-auto absolute right-3 top-1/2 flex h-44 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-surface/80"
+        className="pointer-events-auto absolute right-3 top-1/2 flex h-64 w-12 -translate-y-1/2 touch-none items-center justify-center rounded-full border border-border bg-surface/80"
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
           setFromPointer("pitch", event);
@@ -51,7 +51,7 @@ function LookPads() {
         <span className="pointer-events-none absolute top-2 font-mono text-[10px] text-muted">arriba</span>
         <span
           className="pointer-events-none absolute left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-accent"
-          style={{ top: `calc(${((12 - lookPitch) / 26) * 100}% - 12px)` }}
+          style={{ top: `calc(${((20 - lookPitch) / 44) * 100}% - 12px)` }}
         />
         <span className="pointer-events-none absolute bottom-2 font-mono text-[10px] text-muted">abajo</span>
       </div>
@@ -83,6 +83,7 @@ export function StudioApp() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLElement>(null);
   const [fill, setFill] = useState(false);
+  const [fillHeight, setFillHeight] = useState(0);
   const [sheet, setSheet] = useState<"controls" | "inspector" | null>(null);
   const showOverlay = useStudio((state) => state.showOverlay);
   const camera = useLive((state) => state.camera);
@@ -99,6 +100,18 @@ export function StudioApp() {
       document.removeEventListener("webkitfullscreenchange", onChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (!fill) return;
+    const fit = () => setFillHeight(Math.round(window.visualViewport?.height ?? window.innerHeight));
+    fit();
+    window.visualViewport?.addEventListener("resize", fit);
+    window.visualViewport?.addEventListener("scroll", fit);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", fit);
+      window.visualViewport?.removeEventListener("scroll", fit);
+    };
+  }, [fill]);
 
   async function toggleStage() {
     const stage = stageRef.current;
@@ -140,10 +153,10 @@ export function StudioApp() {
     <div
       className={
         fill
-          ? "fixed inset-x-0 top-0 z-[70] flex w-screen flex-col overflow-hidden bg-bg text-fg"
+          ? "fixed inset-x-0 top-0 z-[70] flex w-screen touch-manipulation flex-col overflow-hidden bg-bg text-fg"
           : "flex h-dvh flex-col overflow-hidden bg-bg text-fg"
       }
-      style={fill ? { height: `${window.screen.height}px` } : undefined}
+      style={fill ? { height: `${fillHeight || Math.round(window.visualViewport?.height ?? window.innerHeight)}px` } : undefined}
     >
       <header className={`flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:px-4 ${fill ? "hidden" : ""}`}>
         <div className="flex min-w-0 items-center gap-1.5 text-sm font-semibold tracking-tight sm:text-lg">
