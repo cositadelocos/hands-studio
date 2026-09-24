@@ -66,6 +66,7 @@ export interface FrameView {
   showVideo: boolean;
   debug: boolean;
   videoCanvas: HTMLCanvasElement | null;
+  videoRevision: number;
   hands: Partial<Record<Side, HandView>>;
   rays: Partial<Record<Side, RayView>>;
   moves: { id: string; position: Vec3 }[];
@@ -115,6 +116,7 @@ export class SceneEngine {
   private readonly raycaster = new Raycaster();
   private readonly rayOrigin = new Vector3();
   private readonly rayDir = new Vector3();
+  private readonly projected = new Vector3();
   private readonly pointer = new Vector2();
   private readonly nodes = new Map<string, Object3D>();
   private readonly landmarks: InstancedMesh;
@@ -135,6 +137,7 @@ export class SceneEngine {
   private readonly ring: Mesh;
   private readonly root: Group;
   private videoTexture: CanvasTexture | null = null;
+  private videoRevision = -1;
   private objectRef: SceneObject[] | null = null;
   private spaceKey = "";
   private hoverId: string | null = null;
@@ -147,7 +150,13 @@ export class SceneEngine {
   constructor(canvas: HTMLCanvasElement) {
     this.root = new Group();
     this.scene.background = new Color(0x0c0f12);
-    this.renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+    this.renderer = new WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: true,
+      powerPreference: "high-performance",
+    });
     this.renderer.setClearColor(0x0c0f12, 1);
     this.renderer.outputColorSpace = SRGBColorSpace;
     this.renderer.toneMapping = ACESFilmicToneMapping;
@@ -162,7 +171,7 @@ export class SceneEngine {
     const key = new DirectionalLight(0xfff3e4, 2.5);
     key.position.set(0.9, 2.4, 1.5);
     key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
+    key.shadow.mapSize.set(512, 512);
     key.shadow.camera.near = 0.2;
     key.shadow.camera.far = 6;
     key.shadow.camera.left = -1.2;
@@ -296,8 +305,19 @@ export class SceneEngine {
     if (width < 2 || height < 2) return;
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
     this.renderer.setSize(width, height, false);
+  }
+
+  pickThrough(point: Vec3): RayHit | null {
+    this.projected.set(point[0], point[1], point[2]).project(this.camera);
+    if (this.projected.x < -1.15 || this.projected.x > 1.15 || this.projected.y < -1.15 || this.projected.y > 1.15) {
+      return null;
+    }
+    this.pointer.set(this.projected.x, this.projected.y);
+    this.raycaster.far = 40;
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    return this.firstHit(this.raycaster.intersectObjects([...this.nodes.values()], true));
   }
 
   raycast(origin: Vec3, direction: Vec3): RayHit | null {
@@ -378,7 +398,7 @@ export class SceneEngine {
     }
     this.applySelection(view.selectedId);
     this.paintHover(view.hoveredId);
-    this.mountVideo(view.videoCanvas, view.showVideo);
+    this.mountVideo(view.videoCanvas, view.showVideo, view.videoRevision);
     this.orbit.update();
     this.renderer.render(this.scene, this.camera);
   }
@@ -461,11 +481,11 @@ export class SceneEngine {
   private createPrimitive(object: SceneObject): Mesh {
     const geometry =
       object.kind === "sphere"
-        ? new SphereGeometry(0.5, 32, 24)
+        ? new SphereGeometry(0.5, 16, 12)
         : object.kind === "torus"
-          ? new TorusGeometry(0.36, 0.13, 18, 36)
+          ? new TorusGeometry(0.36, 0.13, 10, 20)
           : object.kind === "cylinder"
-            ? new CylinderGeometry(0.42, 0.42, 1, 24)
+            ? new CylinderGeometry(0.42, 0.42, 1, 16)
             : new BoxGeometry(1, 1, 1);
     const mesh = new Mesh(
       geometry,
@@ -583,7 +603,7 @@ export class SceneEngine {
     });
   }
 
-  private mountVideo(canvas: HTMLCanvasElement | null, show: boolean): void {
+  private mountVideo(canvas: HTMLCanvasElement | null, show: boolean, revision: number): void {
     const material = this.wall.material as MeshStandardMaterial;
     if (!show || !canvas) {
       if (material.map) {
@@ -599,7 +619,9 @@ export class SceneEngine {
     } else if (this.videoTexture.image !== canvas) {
       this.videoTexture.image = canvas;
     }
-    this.videoTexture.needsUpdate = true;
+    const changed = revision !== this.videoRevision;
+    this.videoRevision = revision;
+    if (changed) this.videoTexture.needsUpdate = true;
     if (material.map !== this.videoTexture) {
       material.map = this.videoTexture;
       material.color.setHex(0xffffff);

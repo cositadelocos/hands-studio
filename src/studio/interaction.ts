@@ -1,10 +1,13 @@
-import { vadd, vdist, vsub } from "@/studio/math";
+import { clamp } from "@/studio/math";
 import type { Vec3 } from "@/studio/math";
-import type { SceneObject, Side, StudioHand } from "@/studio/types";
+import type { InteractionSpace, SceneObject, Side, StudioHand } from "@/studio/types";
 
 export interface Hold {
   id: string;
-  offset: Vec3;
+  offsetX: number;
+  offsetY: number;
+  z: number;
+  span: number;
 }
 
 export interface InteractionMemory {
@@ -38,15 +41,47 @@ export function objectRadius(object: SceneObject): number {
   return 0.55 * scale;
 }
 
+function seenId(
+  hit: RayHit | null,
+  taken: (id: string) => boolean,
+  objects: SceneObject[],
+): string | null {
+  if (!hit || taken(hit.id)) return null;
+  const object = objects.find((item) => item.id === hit.id);
+  if (!object?.grabbable || !object.visible) return null;
+  return hit.id;
+}
+
+function nearestPlanar(
+  objects: SceneObject[],
+  point: Vec3,
+  taken: (id: string) => boolean,
+): string | null {
+  let best: string | null = null;
+  let bestD = Infinity;
+  for (const object of objects) {
+    if (!object.grabbable || !object.visible || taken(object.id)) continue;
+    const distance = Math.hypot(point[0] - object.position[0], point[1] - object.position[1]);
+    const limit = objectRadius(object) + 0.12;
+    if (distance < limit && distance < bestD) {
+      bestD = distance;
+      best = object.id;
+    }
+  }
+  return best;
+}
+
 /**
- * Pinch grabs the pointed object, or the nearest one inside a small radius.
- * Releasing the pinch drops it. Each hand can hold one object.
+ * Pinch grabs whatever sits under the hand in the view, front or back.
+ * While held, moving toward the lens pulls the object forward; moving away pushes it back.
  */
 export function stepInteraction(
   memory: InteractionMemory,
   hands: Partial<Record<Side, StudioHand>>,
   objects: SceneObject[],
   raycast: (origin: Vec3, direction: Vec3) => RayHit | null,
+  pickThrough: (point: Vec3) => RayHit | null,
+  space: InteractionSpace,
   allowManipulate: boolean,
 ): InteractionResult {
   const holds: Partial<Record<Side, Hold>> = { ...memory.holds };
@@ -66,7 +101,14 @@ export function stepInteraction(
       delete holds[side];
       continue;
     }
-    moves.push({ id: hold.id, position: vadd(hand.pinchPoint, hold.offset) });
+    moves.push({
+      id: hold.id,
+      position: [
+        hand.pinchPoint[0] + hold.offsetX,
+        hand.pinchPoint[1] + hold.offsetY,
+        clamp(hold.z + (hand.span - hold.span) * (space.depth / 0.06), space.offsetZ - space.depth * 0.5, space.offsetZ + space.depth * 0.5),
+      ],
+    });
   }
 
   for (const side of ["left", "right"] as const) {
@@ -78,31 +120,27 @@ export function stepInteraction(
       hoveredId = hit.id;
       hoveredBy = side;
     }
+    const aimed = pickThrough(hand.pinchPoint);
+    if (aimed && !hoveredId) {
+      hoveredId = aimed.id;
+      hoveredBy = side;
+    }
     if (holds[side] || !hand.pinch || !allowManipulate || hand.confidence < 0.35) continue;
 
-    let target = hit && !taken(hit.id) ? hit.id : null;
-    const targetObject = objects.find((object) => object.id === target);
-    if (targetObject && (!targetObject.grabbable || !targetObject.visible)) target = null;
-
-    if (!target) {
-      let best: string | null = null;
-      let bestD = Infinity;
-      for (const object of objects) {
-        if (!object.grabbable || !object.visible || taken(object.id)) continue;
-        const distance = vdist(hand.pinchPoint, object.position);
-        const limit = objectRadius(object) + 0.04;
-        if (distance < limit && distance < bestD) {
-          bestD = distance;
-          best = object.id;
-        }
-      }
-      target = best;
-    }
+    let target = seenId(aimed, taken, objects);
+    if (!target && hit) target = seenId(hit, taken, objects);
+    if (!target) target = nearestPlanar(objects, hand.pinchPoint, taken);
 
     if (!target) continue;
     const object = objects.find((item) => item.id === target);
     if (!object) continue;
-    holds[side] = { id: target, offset: vsub(object.position, hand.pinchPoint) };
+    holds[side] = {
+      id: target,
+      offsetX: object.position[0] - hand.pinchPoint[0],
+      offsetY: object.position[1] - hand.pinchPoint[1],
+      z: object.position[2],
+      span: hand.span,
+    };
   }
 
   memory.holds = holds;

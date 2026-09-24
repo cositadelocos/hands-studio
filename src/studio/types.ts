@@ -47,6 +47,8 @@ export interface StudioHand {
   pointOrigin: Vec3;
   pointDirection: Vec3;
   pinchPoint: Vec3;
+  /** Apparent palm size in the image. Larger means the hand is closer to the lens. */
+  span: number;
 }
 
 export interface Anchor {

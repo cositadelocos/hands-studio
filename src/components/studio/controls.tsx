@@ -102,7 +102,7 @@ export function LeftPanel() {
           </div>
           <p className="mt-2 text-sm text-muted">
             {camera === "live"
-              ? "Seguimiento en vivo. Izquierda en verde, derecha en coral."
+              ? "Pellizca el objeto que ves, esté al fondo o adelante. Sin soltar, acércate a la cámara para traerlo y aléjate para llevarlo al fondo."
               : camera === "error"
                 ? cameraError
                 : "Demostración. La mano izquierda pellizca el cubo en bucle."}

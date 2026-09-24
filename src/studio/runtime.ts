@@ -43,6 +43,7 @@ function viewFrom(studio: StudioState, extra: Partial<FrameView> = {}): FrameVie
     showVideo: false,
     debug: studio.debug,
     videoCanvas: null,
+    videoRevision: 0,
     hands: {},
     rays: {},
     moves: [],
@@ -211,6 +212,8 @@ export function startRuntime(
       tracked.hands,
       useStudio.getState().objects,
       (origin, direction) => engine.raycast(origin, direction),
+      (point) => engine.pickThrough(point),
+      studio.space,
       mode === "camera" || studio.demoDrive,
     );
 
@@ -230,6 +233,7 @@ export function startRuntime(
       viewFrom(fresh, {
         showVideo: fresh.showVideo && mode === "camera",
         videoCanvas: mode === "camera" ? mediapipe.display : null,
+        videoRevision: mode === "camera" ? mediapipe.revision : 0,
         hands: {
           left: tracked.hands.left
             ? { points: tracked.hands.left.points, rotation: palmRotation(tracked.hands.left.points) }

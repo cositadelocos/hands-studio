@@ -3,11 +3,12 @@ import type { Vec3 } from "@/studio/math";
 import { assignHands, createWristMemory, type WristMemory } from "@/studio/assign-hands";
 import { buildAnchors } from "@/studio/anchors";
 import { readGestures } from "@/studio/gestures";
-import { mapHand } from "@/studio/space-map";
+import { mapHand, palmSpan } from "@/studio/space-map";
 import type { Anchor, Side, StudioHand, TrackSettings, TrackingFrame } from "@/studio/types";
 
 export interface SmoothMemory {
   points: Partial<Record<Side, Vec3[]>>;
+  span: Partial<Record<Side, number>>;
   lost: Record<Side, number>;
 }
 
@@ -19,7 +20,7 @@ export interface PipelineMemory {
 export function createPipelineMemory(): PipelineMemory {
   return {
     wrists: createWristMemory(),
-    smooth: { points: {}, lost: { left: 0, right: 0 } },
+    smooth: { points: {}, span: {}, lost: { left: 0, right: 0 } },
   };
 }
 
@@ -44,10 +45,17 @@ export function advanceTracking(
     const raw = assigned[side];
     if (!raw || raw.world.length < 21 || raw.image.length < 21) {
       memory.smooth.lost[side] += 1;
-      if (memory.smooth.lost[side] > 6) delete memory.smooth.points[side];
+      if (memory.smooth.lost[side] > 6) {
+        delete memory.smooth.points[side];
+        delete memory.smooth.span[side];
+      }
       continue;
     }
-    const mapped = mapHand(raw.image, raw.world, settings.space, settings.handScale);
+    const rawSpan = palmSpan(raw.image);
+    const previousSpan = memory.smooth.span[side];
+    const span = previousSpan === undefined ? rawSpan : previousSpan + (rawSpan - previousSpan) * 0.22;
+    memory.smooth.span[side] = span;
+    const mapped = mapHand(raw.image, raw.world, settings.space, settings.handScale, span);
     const alpha = memory.smooth.lost[side] > 4 ? 1 : settings.smoothing;
     const points = smoothPoints(memory.smooth.points[side], mapped, alpha);
     memory.smooth.points[side] = points;
@@ -58,6 +66,7 @@ export function advanceTracking(
       confidence: raw.score,
       points,
       image: raw.image,
+      span,
       ...gesture,
     };
   }

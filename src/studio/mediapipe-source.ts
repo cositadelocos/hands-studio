@@ -20,7 +20,7 @@ export type FacingMode = "user" | "environment";
 
 /**
  * Camera → Hand Landmarker. Emits RawHand only.
- * Front camera frames are mirrored before inference so left/right match the user.
+ * Front camera is drawn unmirrored. Handedness is swapped to match the person.
  */
 export class MediaPipeSource {
   readonly display: HTMLCanvasElement;
@@ -32,6 +32,8 @@ export class MediaPipeSource {
   private running = false;
   facing: FacingMode = "user";
   invertHands = false;
+  revision = 0;
+  private lastDetectAt = -1;
 
   constructor(private readonly video: HTMLVideoElement) {
     this.display = document.createElement("canvas");
@@ -48,7 +50,7 @@ export class MediaPipeSource {
     }
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, max: 30 } },
     });
     this.stream = stream;
     this.video.srcObject = stream;
@@ -87,17 +89,23 @@ export class MediaPipeSource {
     const width = this.video.videoWidth;
     const height = this.video.videoHeight;
     if (!width || !height) return this.last;
-    if (this.display.width !== width || this.display.height !== height) {
-      this.display.width = width;
-      this.display.height = height;
+    if (this.last && now - this.lastDetectAt < 32) return this.last;
+    const maxWidth = 640;
+    const scale = width > maxWidth ? maxWidth / width : 1;
+    const drawWidth = Math.max(2, Math.round(width * scale));
+    const drawHeight = Math.max(2, Math.round(height * scale));
+    if (this.display.width !== drawWidth || this.display.height !== drawHeight) {
+      this.display.width = drawWidth;
+      this.display.height = drawHeight;
     }
-    const mirror = this.facing === "user";
-    this.ctx.setTransform(mirror ? -1 : 1, 0, 0, 1, mirror ? width : 0, 0);
-    this.ctx.drawImage(this.video, 0, 0, width, height);
+    const mirror = this.facing !== "user";
+    this.ctx.setTransform(mirror ? -1 : 1, 0, 0, 1, mirror ? drawWidth : 0, 0);
+    this.ctx.drawImage(this.video, 0, 0, drawWidth, drawHeight);
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     const timestamp = Math.max(now, this.lastTs + 1);
     this.lastTs = timestamp;
+    this.lastDetectAt = now;
     const started = performance.now();
     let result: ReturnType<Landmarker["detectForVideo"]>;
     try {
@@ -105,7 +113,7 @@ export class MediaPipeSource {
     } catch {
       return this.last;
     }
-    const swap = (this.facing === "environment") !== this.invertHands;
+    const swap = !mirror !== this.invertHands;
     const hands: RawHand[] = [];
     result.landmarks.forEach((landmarks, index) => {
       const category = result.handedness[index]?.[0];
@@ -126,6 +134,7 @@ export class MediaPipeSource {
         hands.push({ handedness: side, score: category?.score ?? 0, image, world });
       }
     });
+    this.revision += 1;
     this.last = { timestamp, latencyMs: performance.now() - started, source: "mediapipe", hands };
     return this.last;
   }
