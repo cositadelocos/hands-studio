@@ -17,6 +17,8 @@ import {
   InstancedMesh,
   LineBasicMaterial,
   LineSegments,
+  LinearFilter,
+  LinearMipmapLinearFilter,
   Mesh,
   MeshBasicMaterial,
   MeshLambertMaterial,
@@ -28,6 +30,7 @@ import {
   Scene,
   SphereGeometry,
   SRGBColorSpace,
+  Texture,
   TorusGeometry,
   Vector2,
   Vector3,
@@ -112,20 +115,27 @@ function writeSegment(line: LineSegments, a: Vec3, b: Vec3): void {
   attribute.needsUpdate = true;
 }
 
-async function downscaleImage(file: File, maxEdge: number): Promise<HTMLCanvasElement> {
+async function skyTexture(file: File): Promise<Texture> {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(2, Math.round(bitmap.width * scale));
-  canvas.height = Math.max(2, Math.round(bitmap.height * scale));
-  const context = canvas.getContext("2d", { alpha: false });
-  if (!context) {
-    bitmap.close();
-    throw new Error("No se pudo preparar la imagen 360.");
-  }
-  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return canvas;
+  const longest = Math.max(bitmap.width, bitmap.height);
+  const maxEdge = 4096;
+  const source =
+    longest <= maxEdge
+      ? bitmap
+      : await createImageBitmap(bitmap, {
+          resizeWidth: bitmap.width >= bitmap.height ? maxEdge : Math.round((bitmap.width / bitmap.height) * maxEdge),
+          resizeHeight: bitmap.height > bitmap.width ? maxEdge : Math.round((bitmap.height / bitmap.width) * maxEdge),
+          resizeQuality: "high",
+        });
+  if (source !== bitmap) bitmap.close();
+  const texture = new Texture(source);
+  texture.colorSpace = SRGBColorSpace;
+  texture.minFilter = LinearMipmapLinearFilter;
+  texture.magFilter = LinearFilter;
+  texture.generateMipmaps = true;
+  texture.anisotropy = 8;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 export class SceneEngine {
@@ -161,7 +171,7 @@ export class SceneEngine {
   private roomModel: Group | null = null;
   private roomFit = 1;
   private readonly photo: Mesh;
-  private photoTexture: CanvasTexture | null = null;
+  private photoTexture: Texture | null = null;
   private stayHere = true;
   private yaw = 0;
   private pitch = -0.42;
@@ -269,7 +279,7 @@ export class SceneEngine {
     this.ring.visible = false;
     this.scene.add(this.room);
     this.photo = new Mesh(
-      new SphereGeometry(16, 24, 16),
+      new SphereGeometry(16, 64, 32),
       new MeshBasicMaterial({ color: 0xffffff, side: BackSide }),
     );
     this.photo.frustumCulled = false;
@@ -468,19 +478,21 @@ export class SceneEngine {
   }
 
   async loadSky(file: File): Promise<void> {
-    const canvas = await downscaleImage(file, 1280);
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = SRGBColorSpace;
-    texture.needsUpdate = true;
-    this.photoTexture?.dispose();
+    const texture = await skyTexture(file);
+    const previous = this.photoTexture;
     this.photoTexture = texture;
     const material = this.photo.material as MeshBasicMaterial;
     material.map = texture;
     material.needsUpdate = true;
+    previous?.dispose();
+    const image = previous?.image as { close?: () => void } | undefined;
+    image?.close?.();
   }
 
   clearSky(): void {
+    const image = this.photoTexture?.image as { close?: () => void } | undefined;
     this.photoTexture?.dispose();
+    image?.close?.();
     this.photoTexture = null;
     const material = this.photo.material as MeshBasicMaterial;
     material.map = null;
