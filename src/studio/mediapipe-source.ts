@@ -131,7 +131,7 @@ export class MediaPipeSource {
       const world: Vec3[] = (result.worldLandmarks[index] ?? []).map((landmark) => [
         landmark.x,
         -landmark.y,
-        -landmark.z,
+        landmark.z,
       ]);
       if (image.length >= 21 && world.length >= 21) {
         hands.push({ handedness: side, score: category?.score ?? 0, image, world });
