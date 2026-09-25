@@ -131,7 +131,7 @@ export class RightHandRig {
       points[9][1] - points[0][1],
       points[9][2] - points[0][2],
     );
-    const desired = Math.min(4, Math.max(0.05, (length / this.restKnuckle) * 0.58));
+    const desired = Math.min(4, Math.max(0.05, (length / this.restKnuckle) * 0.85));
     if (!this.sized) {
       this.shownScale = desired;
       this.sized = true;
@@ -148,8 +148,6 @@ export class RightHandRig {
       this.root.updateMatrixWorld(true);
     }
     this.pin(points[0]);
-    this.root.updateMatrixWorld(true);
-    this.seatPalm(points[9]);
     this.root.updateMatrixWorld(true);
   }
 
@@ -205,15 +203,5 @@ export class RightHandRig {
     this.root.position.x += wrist[0] - this.x.x;
     this.root.position.y += wrist[1] - this.x.y;
     this.root.position.z += wrist[2] - this.x.z;
-  }
-
-  /** Shift the palm so the middle knuckle sits on its landmark, not past it. */
-  private seatPalm(knuckle: Vec3 | undefined): void {
-    const bone = this.bones.get("mixamorigRightHandMiddle1");
-    if (!bone || !knuckle) return;
-    bone.getWorldPosition(this.x);
-    this.root.position.x += (knuckle[0] - this.x.x) * 0.65;
-    this.root.position.y += (knuckle[1] - this.x.y) * 0.65;
-    this.root.position.z += (knuckle[2] - this.x.z) * 0.65;
   }
 }

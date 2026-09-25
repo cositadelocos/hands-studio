@@ -61,7 +61,7 @@ export function mapHand(
   const anchor = mapWrist(image[0] ?? { x: 0.5, y: 0.5, z: 0 }, span, space);
   const origin = world[0] ?? [0, 0, 0];
   return world.map((point) => [
-    anchor[0] - (point[0] - origin[0]) * scale,
+    anchor[0] + (point[0] - origin[0]) * scale,
     anchor[1] + (point[1] - origin[1]) * scale,
     anchor[2] + (point[2] - origin[2]) * scale,
   ]);
