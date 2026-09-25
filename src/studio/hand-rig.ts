@@ -39,6 +39,7 @@ export class RightHandRig {
   private readonly restWrist = new Vector3();
   private readonly restBasis = new Quaternion();
   private restLength = 0.2;
+  private restKnuckle = 0.1;
   private shownScale = 1;
   private sized = false;
   private readonly x = new Vector3();
@@ -94,6 +95,7 @@ export class RightHandRig {
       pinky.getWorldPosition(this.z);
       tip.getWorldPosition(this.dir);
       this.restLength = Math.max(0.02, this.restWrist.distanceTo(this.dir));
+      this.restKnuckle = Math.max(0.02, this.restWrist.distanceTo(this.y));
       this.y.sub(this.restWrist);
       this.x.sub(this.z);
       this.compose(this.x, this.y, this.restBasis);
@@ -102,7 +104,7 @@ export class RightHandRig {
     this.root.visible = false;
   }
 
-  pose(points: Vec3[] | undefined): void {
+  pose(points: Vec3[] | undefined, intoStudio?: Vector3): void {
     if (!this.ready) return;
     if (!points || points.length < 21) {
       this.root.visible = false;
@@ -110,34 +112,29 @@ export class RightHandRig {
     }
     this.root.visible = true;
     const length = Math.hypot(
-      points[12][0] - points[0][0],
-      points[12][1] - points[0][1],
-      points[12][2] - points[0][2],
+      points[9][0] - points[0][0],
+      points[9][1] - points[0][1],
+      points[9][2] - points[0][2],
     );
-    const desired = Math.min(4, Math.max(0.05, (length / this.restLength) * 1.08));
+    const desired = Math.min(4, Math.max(0.05, (length / this.restKnuckle) * 1.08));
     if (!this.sized) {
       this.shownScale = desired;
       this.sized = true;
     } else {
-      this.shownScale += (desired - this.shownScale) * 0.45;
+      this.shownScale += (desired - this.shownScale) * 0.2;
     }
-    this.placeRoot(points);
-    for (let step = 0; step < 3; step += 1) {
-      for (let index = step; index < LINKS.length; index += 3) {
-        const link = LINKS[index];
-        this.aimLink(link.name, points[link.from], points[link.to]);
-      }
-      this.root.updateMatrixWorld(true);
-    }
+    this.placeRoot(points, intoStudio);
     this.pin(points[0]);
     this.root.updateMatrixWorld(true);
   }
 
-  /** Move the whole bind-pose hand onto the wrist before the fingers curl. */
-  private placeRoot(points: Vec3[]): void {
+  /** Back of the hand toward the camera. Palm faces into the studio. Fingers stay open. */
+  private placeRoot(points: Vec3[], intoStudio?: Vector3): void {
     this.y.set(points[9][0] - points[0][0], points[9][1] - points[0][1], points[9][2] - points[0][2]);
     this.x.set(points[5][0] - points[17][0], points[5][1] - points[17][1], points[5][2] - points[17][2]);
     if (this.y.lengthSq() < 1e-8 || this.x.lengthSq() < 1e-8) return;
+    this.dir.crossVectors(this.x, this.y);
+    if (intoStudio && this.dir.dot(intoStudio) < 0) this.x.negate();
     this.compose(this.x, this.y, this.worldQuat);
     this.delta.copy(this.restBasis).invert();
     this.root.quaternion.copy(this.worldQuat).multiply(this.delta);
