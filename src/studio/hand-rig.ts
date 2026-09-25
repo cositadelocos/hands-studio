@@ -148,6 +148,7 @@ export class RightHandRig {
       this.root.updateMatrixWorld(true);
     }
     this.pin(points[0]);
+    this.root.position.y -= length * 0.46;
     this.root.updateMatrixWorld(true);
   }
 
