@@ -968,7 +968,7 @@ export class SceneEngine {
     this.landmarks.visible = view.showLandmarks;
     this.placeHand(view.hands.left, 0, this.leftBones, this.leftAxes, view, false);
     this.placeHand(view.hands.right, 21, this.rightBones, this.rightAxes, view, false);
-    this.rightRig.pose(view.hands.left?.points);
+    this.rightRig.pose(view.hands.right?.points);
     this.landmarks.instanceMatrix.needsUpdate = true;
   }
 
