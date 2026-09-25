@@ -34,9 +34,6 @@ interface RestBone {
  */
 export class RightHandRig {
   readonly root = new Group();
-  /** Turns local Z onto the palm, so the mirror flips the palm and not the thumb. */
-  private readonly turn = new Group();
-  private readonly mirror = new Group();
   ready = false;
   private readonly bones = new Map<string, Bone>();
   private readonly rest = new Map<string, RestBone>();
@@ -118,12 +115,6 @@ export class RightHandRig {
         rest.localTwist.normalize();
       }
     }
-    this.turn.quaternion.copy(this.restBasis);
-    this.mirror.quaternion.copy(this.restBasis).invert();
-    this.mirror.scale.set(1, 1, -1);
-    this.root.add(this.turn);
-    this.turn.add(this.mirror);
-    this.mirror.add(gltf.scene);
     this.ready = this.bones.has(PALM);
     this.root.visible = false;
   }
@@ -168,6 +159,12 @@ export class RightHandRig {
     this.compose(this.x, this.y, this.worldQuat);
     this.delta.copy(this.restBasis).invert();
     this.root.quaternion.copy(this.worldQuat).multiply(this.delta);
+    this.dir.copy(this.y);
+    if (this.dir.lengthSq() > 1e-8) {
+      this.dir.normalize();
+      this.parentQuat.setFromAxisAngle(this.dir, Math.PI);
+      this.root.quaternion.premultiply(this.parentQuat);
+    }
     this.root.scale.setScalar(this.shownScale);
     this.z.copy(this.restWrist).multiplyScalar(this.shownScale).applyQuaternion(this.root.quaternion);
     this.root.position.set(points[0][0] - this.z.x, points[0][1] - this.z.y, points[0][2] - this.z.z);
