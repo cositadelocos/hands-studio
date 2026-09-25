@@ -22,7 +22,7 @@ export function palmSpan(image: NormPoint[]): number {
 export function mapWrist(image: NormPoint, span: number, _space: InteractionSpace): Vec3 {
   const closeness = closenessFromSpan(span);
   return [
-    (image.x - 0.5) * HAND_HALF_X * 2,
+    (0.5 - image.x) * HAND_HALF_X * 2,
     (HAND_Y_BIAS - image.y) * HAND_Y_SPAN,
     lerp(HAND_Z_FAR, HAND_Z_NEAR, closeness),
   ];
@@ -30,7 +30,7 @@ export function mapWrist(image: NormPoint, span: number, _space: InteractionSpac
 
 export function wristToImage(wrist: Vec3, _space: InteractionSpace): { x: number; y: number } {
   return {
-    x: wrist[0] / (HAND_HALF_X * 2) + 0.5,
+    x: 0.5 - wrist[0] / (HAND_HALF_X * 2),
     y: HAND_Y_BIAS - wrist[1] / HAND_Y_SPAN,
   };
 }
