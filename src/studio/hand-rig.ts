@@ -151,20 +151,20 @@ export class RightHandRig {
     this.root.updateMatrixWorld(true);
   }
 
-  /** Keep the thumb on the same side as its landmarks. No extra roll. */
+  /** Thumb side follows the thumb landmark. Fingers follow the middle knuckle. */
   private placeRoot(points: Vec3[], _intoStudio?: Vector3): void {
     this.y.set(points[9][0] - points[0][0], points[9][1] - points[0][1], points[9][2] - points[0][2]);
-    this.x.set(points[5][0] - points[17][0], points[5][1] - points[17][1], points[5][2] - points[17][2]);
-    if (this.y.lengthSq() < 1e-8 || this.x.lengthSq() < 1e-8) return;
+    const thumb = points[2] ?? points[5];
+    this.x.set(thumb[0] - points[0][0], thumb[1] - points[0][1], thumb[2] - points[0][2]);
+    const fingerLen = this.y.lengthSq();
+    if (fingerLen < 1e-8) return;
+    this.x.addScaledVector(this.y, -this.x.dot(this.y) / fingerLen);
+    if (this.x.lengthSq() < 1e-8) {
+      this.x.set(points[5][0] - points[17][0], points[5][1] - points[17][1], points[5][2] - points[17][2]);
+    }
     this.compose(this.x, this.y, this.worldQuat);
     this.delta.copy(this.restBasis).invert();
     this.root.quaternion.copy(this.worldQuat).multiply(this.delta);
-    this.dir.copy(this.y);
-    if (this.dir.lengthSq() > 1e-8) {
-      this.dir.normalize();
-      this.parentQuat.setFromAxisAngle(this.dir, Math.PI);
-      this.root.quaternion.premultiply(this.parentQuat);
-    }
     this.root.scale.setScalar(this.shownScale);
     this.z.copy(this.restWrist).multiplyScalar(this.shownScale).applyQuaternion(this.root.quaternion);
     this.root.position.set(points[0][0] - this.z.x, points[0][1] - this.z.y, points[0][2] - this.z.z);
@@ -197,10 +197,6 @@ export class RightHandRig {
     this.restDir.copy(rest.localDir).applyQuaternion(rest.quat);
     if (this.restDir.lengthSq() < 1e-8) return;
     this.delta.setFromUnitVectors(this.restDir.normalize(), this.aim);
-    if (this.delta.w < 0.25) {
-      bone.quaternion.copy(rest.quat);
-      return;
-    }
     bone.quaternion.copy(this.delta).multiply(rest.quat);
   }
 
