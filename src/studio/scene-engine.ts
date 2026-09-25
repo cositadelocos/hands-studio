@@ -970,7 +970,7 @@ export class SceneEngine {
     this.placeHand(view.hands.left, 0, this.leftBones, this.leftAxes, view, false);
     this.placeHand(view.hands.right, 21, this.rightBones, this.rightAxes, view, false);
     this.camera.getWorldDirection(this.viewForward);
-    this.rightRig.pose(view.hands.left?.points, this.viewForward);
+    this.rightRig.pose(view.hands.right?.points, this.viewForward);
     this.landmarks.instanceMatrix.needsUpdate = true;
   }
 
