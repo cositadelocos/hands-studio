@@ -25,6 +25,7 @@ const PALM = "mixamorigRightHand";
 interface RestBone {
   quat: Quaternion;
   localDir: Vector3;
+  localTwist: Vector3;
 }
 
 /**
@@ -51,6 +52,9 @@ export class RightHandRig {
   private readonly worldQuat = new Quaternion();
   private readonly delta = new Quaternion();
   private readonly basis = new Matrix4();
+  private readonly palmNormal = new Vector3();
+  private readonly aim = new Vector3();
+  private readonly up = new Vector3();
 
   async load(url: string): Promise<void> {
     const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
@@ -81,7 +85,7 @@ export class RightHandRig {
       const localDir = child ? child.position.clone() : new Vector3(0, 1, 0);
       if (localDir.lengthSq() < 1e-8) localDir.set(0, 1, 0);
       localDir.normalize();
-      this.rest.set(name, { quat: bone.quaternion.clone(), localDir });
+      this.rest.set(name, { quat: bone.quaternion.clone(), localDir, localTwist: new Vector3(0, 0, 1) });
     }
     const wrist = this.bones.get(PALM);
     const mid = this.bones.get("mixamorigRightHandMiddle1");
@@ -99,6 +103,17 @@ export class RightHandRig {
       this.y.sub(this.restWrist);
       this.x.sub(this.z);
       this.compose(this.x, this.y, this.restBasis);
+      this.palmNormal.set(0, 0, 1).applyQuaternion(this.restBasis);
+      for (const link of LINKS) {
+        const bone = this.bones.get(link.name);
+        const rest = this.rest.get(link.name);
+        if (!bone || !rest) continue;
+        bone.getWorldQuaternion(this.worldQuat);
+        rest.localTwist.copy(this.palmNormal).applyQuaternion(this.worldQuat.invert());
+        rest.localTwist.addScaledVector(rest.localDir, -rest.localTwist.dot(rest.localDir));
+        if (rest.localTwist.lengthSq() < 1e-8) rest.localTwist.set(0, 0, 1);
+        rest.localTwist.normalize();
+      }
     }
     this.ready = this.bones.has(PALM);
     this.root.visible = false;
@@ -121,20 +136,30 @@ export class RightHandRig {
       this.shownScale = desired;
       this.sized = true;
     } else {
-      this.shownScale += (desired - this.shownScale) * 0.2;
+      this.shownScale += (desired - this.shownScale) * 0.55;
     }
     this.placeRoot(points, intoStudio);
+    for (let step = 0; step < 3; step += 1) {
+      for (let index = step; index < LINKS.length; index += 3) {
+        const link = LINKS[index];
+        if (!link) continue;
+        this.aimLink(link.name, points[link.from], points[link.to]);
+      }
+      this.root.updateMatrixWorld(true);
+    }
     this.pin(points[0]);
     this.root.updateMatrixWorld(true);
   }
 
-  /** Back of the hand toward the camera. Palm faces into the studio. Fingers stay open. */
+  /** Sit the open hand on the red landmarks, palm toward the studio. */
   private placeRoot(points: Vec3[], intoStudio?: Vector3): void {
     this.y.set(points[9][0] - points[0][0], points[9][1] - points[0][1], points[9][2] - points[0][2]);
     this.x.set(points[5][0] - points[17][0], points[5][1] - points[17][1], points[5][2] - points[17][2]);
     if (this.y.lengthSq() < 1e-8 || this.x.lengthSq() < 1e-8) return;
-    this.dir.crossVectors(this.x, this.y);
-    if (intoStudio && this.dir.dot(intoStudio) < 0) this.x.negate();
+    this.palmNormal.crossVectors(this.x, this.y);
+    if (intoStudio && this.palmNormal.dot(intoStudio) < 0) this.x.negate();
+    this.palmNormal.crossVectors(this.x, this.y);
+    if (this.palmNormal.lengthSq() > 1e-8) this.palmNormal.normalize();
     this.compose(this.x, this.y, this.worldQuat);
     this.delta.copy(this.restBasis).invert();
     this.root.quaternion.copy(this.worldQuat).multiply(this.delta);
@@ -161,15 +186,37 @@ export class RightHandRig {
     const bone = this.bones.get(name);
     const rest = this.rest.get(name);
     if (!bone?.parent || !rest || !from || !to) return;
-    this.dir.set(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
-    if (this.dir.lengthSq() < 1e-8) return;
-    this.dir.normalize();
+    this.aim.set(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+    if (this.aim.lengthSq() < 1e-8) return;
+    this.aim.normalize();
     bone.parent.getWorldQuaternion(this.parentQuat);
-    this.dir.applyQuaternion(this.parentQuat.invert());
-    this.restDir.copy(rest.localDir).applyQuaternion(rest.quat);
-    if (this.restDir.lengthSq() < 1e-8 || this.dir.lengthSq() < 1e-8) return;
-    this.delta.setFromUnitVectors(this.restDir.normalize(), this.dir.normalize());
-    bone.quaternion.copy(this.delta).multiply(rest.quat);
+    this.parentQuat.invert();
+    this.aim.applyQuaternion(this.parentQuat);
+    this.up.copy(this.palmNormal).applyQuaternion(this.parentQuat);
+    this.up.addScaledVector(this.aim, -this.up.dot(this.aim));
+    if (this.up.lengthSq() < 1e-6) {
+      this.restDir.copy(rest.localDir).applyQuaternion(rest.quat).normalize();
+      this.delta.setFromUnitVectors(this.restDir, this.aim.normalize());
+      bone.quaternion.copy(this.delta).multiply(rest.quat);
+      return;
+    }
+    this.up.normalize();
+    this.dir.copy(rest.localDir).applyQuaternion(rest.quat);
+    this.z.copy(rest.localTwist).applyQuaternion(rest.quat);
+    this.z.addScaledVector(this.dir, -this.z.dot(this.dir));
+    if (this.dir.lengthSq() < 1e-8 || this.z.lengthSq() < 1e-8) return;
+    this.dir.normalize();
+    this.z.normalize();
+    this.frame(this.dir, this.z, this.delta);
+    this.frame(this.aim, this.up, this.worldQuat);
+    bone.quaternion.copy(this.worldQuat).multiply(this.delta.invert());
+  }
+
+  /** Quaternion whose Y axis is `primary` and whose Z axis follows `hint`. */
+  private frame(primary: Vector3, hint: Vector3, out: Quaternion): void {
+    this.x.crossVectors(primary, hint).normalize();
+    this.basis.makeBasis(this.x, primary, hint);
+    out.setFromRotationMatrix(this.basis);
   }
 
   private pin(wrist: Vec3): void {
