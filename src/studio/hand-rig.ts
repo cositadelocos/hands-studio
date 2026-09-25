@@ -119,7 +119,7 @@ export class RightHandRig {
     this.root.visible = false;
   }
 
-  pose(points: Vec3[] | undefined): void {
+  pose(points: Vec3[] | undefined, intoStudio?: Vector3): void {
     if (!this.ready) return;
     if (!points || points.length < 21) {
       this.root.visible = false;
@@ -138,7 +138,7 @@ export class RightHandRig {
     } else {
       this.shownScale += (desired - this.shownScale) * 0.55;
     }
-    this.placeRoot(points);
+    this.placeRoot(points, intoStudio);
     for (let step = 0; step < 3; step += 1) {
       for (let index = step; index < LINKS.length; index += 3) {
         const link = LINKS[index];
@@ -151,11 +151,13 @@ export class RightHandRig {
     this.root.updateMatrixWorld(true);
   }
 
-  /** Sit the open hand on the red landmarks, palm toward the studio. */
-  private placeRoot(points: Vec3[]): void {
+  /** Palm faces the studio so the thumb sits on its landmarks. */
+  private placeRoot(points: Vec3[], intoStudio?: Vector3): void {
     this.y.set(points[9][0] - points[0][0], points[9][1] - points[0][1], points[9][2] - points[0][2]);
     this.x.set(points[5][0] - points[17][0], points[5][1] - points[17][1], points[5][2] - points[17][2]);
     if (this.y.lengthSq() < 1e-8 || this.x.lengthSq() < 1e-8) return;
+    this.dir.crossVectors(this.x, this.y);
+    if (intoStudio && this.dir.dot(intoStudio) < 0) this.x.negate();
     this.compose(this.x, this.y, this.worldQuat);
     this.delta.copy(this.restBasis).invert();
     this.root.quaternion.copy(this.worldQuat).multiply(this.delta);

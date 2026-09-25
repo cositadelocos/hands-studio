@@ -168,6 +168,7 @@ export class SceneEngine {
   private readonly leftBones: LineSegments;
   private readonly rightBones: LineSegments;
   private readonly rightRig = new RightHandRig();
+  private readonly viewForward = new Vector3();
   private readonly leftRay: LineSegments;
   private readonly rightRay: LineSegments;
   private readonly leftHit: Mesh;
@@ -968,7 +969,8 @@ export class SceneEngine {
     this.landmarks.visible = view.showLandmarks;
     this.placeHand(view.hands.left, 0, this.leftBones, this.leftAxes, view, false);
     this.placeHand(view.hands.right, 21, this.rightBones, this.rightAxes, view, false);
-    this.rightRig.pose(view.hands.right?.points);
+    this.camera.getWorldDirection(this.viewForward);
+    this.rightRig.pose(view.hands.right?.points, this.viewForward);
     this.landmarks.instanceMatrix.needsUpdate = true;
   }
 
