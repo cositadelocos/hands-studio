@@ -42,6 +42,7 @@ import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { Vec3 } from "@/studio/math";
 import { HAND_BONES, STUDIO_EYE, TABLE_DEPTH, TABLE_TOP, TABLE_WIDTH, TABLE_Z, type InteractionSpace, type PanoramaSettings, type SceneObject, type Side, type SkyImage, type TransformMode } from "@/studio/types";
 import type { RayHit } from "@/studio/interaction";
+import { RightHandRig } from "@/studio/hand-rig";
 
 export interface HandView {
   points: Vec3[];
@@ -166,6 +167,7 @@ export class SceneEngine {
   private readonly dummy = new Object3D();
   private readonly leftBones: LineSegments;
   private readonly rightBones: LineSegments;
+  private readonly rightRig = new RightHandRig();
   private readonly leftRay: LineSegments;
   private readonly rightRay: LineSegments;
   private readonly leftHit: Mesh;
@@ -325,6 +327,10 @@ export class SceneEngine {
       this.ring,
     );
     this.root.add(this.world);
+    this.world.add(this.rightRig.root);
+    void this.rightRig.load("/models/mano-right.glb").catch(() => {
+      this.rightRig.ready = false;
+    });
     this.scene.add(this.root);
 
     this.orbit = new OrbitControls(this.camera, canvas);
@@ -960,8 +966,10 @@ export class SceneEngine {
 
   private drawHands(view: FrameView): void {
     this.landmarks.visible = view.showLandmarks;
-    this.placeHand(view.hands.left, 0, this.leftBones, this.leftAxes, view);
-    this.placeHand(view.hands.right, 21, this.rightBones, this.rightAxes, view);
+    const rigged = this.rightRig.ready && Boolean(view.hands.right);
+    this.placeHand(view.hands.left, 0, this.leftBones, this.leftAxes, view, false);
+    this.placeHand(view.hands.right, 21, this.rightBones, this.rightAxes, view, rigged);
+    this.rightRig.pose(rigged ? view.hands.right?.points : undefined);
     this.landmarks.instanceMatrix.needsUpdate = true;
   }
 
@@ -971,9 +979,10 @@ export class SceneEngine {
     bones: LineSegments,
     axes: AxesHelper,
     view: FrameView,
+    hide: boolean,
   ): void {
     const positions = (bones.geometry.getAttribute("position") as BufferAttribute).array as Float32Array;
-    if (!hand) {
+    if (!hand || hide) {
       bones.visible = false;
       axes.visible = false;
       for (let index = 0; index < 21; index += 1) {
