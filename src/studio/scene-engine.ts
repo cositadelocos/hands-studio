@@ -966,10 +966,12 @@ export class SceneEngine {
 
   private drawHands(view: FrameView): void {
     this.landmarks.visible = view.showLandmarks;
-    const rigged = this.rightRig.ready && Boolean(view.hands.right);
-    this.placeHand(view.hands.left, 0, this.leftBones, this.leftAxes, view, false);
-    this.placeHand(view.hands.right, 21, this.rightBones, this.rightAxes, view, rigged);
-    this.rightRig.pose(rigged ? view.hands.right?.points : undefined);
+    const points = view.hands.right?.points ?? view.hands.left?.points;
+    const rigged = this.rightRig.ready && Boolean(points);
+    const onRight = Boolean(view.hands.right);
+    this.placeHand(view.hands.left, 0, this.leftBones, this.leftAxes, view, rigged && !onRight);
+    this.placeHand(view.hands.right, 21, this.rightBones, this.rightAxes, view, rigged && onRight);
+    this.rightRig.pose(points);
     this.landmarks.instanceMatrix.needsUpdate = true;
   }
 

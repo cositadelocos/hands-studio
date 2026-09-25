@@ -1,4 +1,4 @@
-import { Bone, Group, Matrix4, Quaternion, SkinnedMesh, Vector3 } from "three";
+import { Bone, DoubleSide, Group, Matrix4, MeshBasicMaterial, Quaternion, SkinnedMesh, Vector3 } from "three";
 import type { Vec3 } from "@/studio/math";
 
 /** Mixamo right-hand bone → MediaPipe landmark pair it should point along. */
@@ -28,14 +28,17 @@ interface RestBone {
 }
 
 /**
- * Skinned Mixamo right hand. The palm follows the wrist basis and each
- * finger bone points at the next MediaPipe landmark.
+ * Skinned Mixamo right hand. The whole model is placed on the wrist,
+ * then each finger bone points at the next MediaPipe landmark.
  */
 export class RightHandRig {
   readonly root = new Group();
   ready = false;
   private readonly bones = new Map<string, Bone>();
+  private readonly meshes: SkinnedMesh[] = [];
   private readonly rest = new Map<string, RestBone>();
+  private readonly restWrist = new Vector3();
+  private readonly restBasis = new Quaternion();
   private restLength = 0.2;
   private shownScale = 1;
   private sized = false;
@@ -58,9 +61,16 @@ export class RightHandRig {
       if ((obj as Bone).isBone) this.bones.set(obj.name, obj as Bone);
       if ((obj as SkinnedMesh).isSkinnedMesh) {
         const mesh = obj as SkinnedMesh;
+        const previous = mesh.material as MeshBasicMaterial;
+        mesh.material = new MeshBasicMaterial({
+          map: previous?.map ?? null,
+          color: previous?.map ? 0xffffff : 0xffc9b0,
+          side: DoubleSide,
+        });
         mesh.frustumCulled = false;
         mesh.castShadow = false;
         mesh.receiveShadow = false;
+        this.meshes.push(mesh);
       }
     });
     this.root.updateMatrixWorld(true);
@@ -72,11 +82,20 @@ export class RightHandRig {
       this.rest.set(name, { quat: bone.quaternion.clone(), localDir });
     }
     const wrist = this.bones.get(PALM);
+    const mid = this.bones.get("mixamorig:RightHandMiddle1");
+    const index = this.bones.get("mixamorig:RightHandIndex1");
+    const pinky = this.bones.get("mixamorig:RightHandPinky1");
     const tip = this.bones.get("mixamorig:RightHandMiddle4");
-    if (wrist && tip) {
-      wrist.getWorldPosition(this.x);
-      tip.getWorldPosition(this.y);
-      this.restLength = Math.max(0.05, this.x.distanceTo(this.y));
+    if (wrist && mid && index && pinky && tip) {
+      wrist.getWorldPosition(this.restWrist);
+      mid.getWorldPosition(this.y);
+      index.getWorldPosition(this.x);
+      pinky.getWorldPosition(this.z);
+      tip.getWorldPosition(this.dir);
+      this.restLength = Math.max(0.02, this.restWrist.distanceTo(this.dir));
+      this.y.sub(this.restWrist);
+      this.x.sub(this.z);
+      this.compose(this.x, this.y, this.restBasis);
     }
     this.ready = this.bones.has(PALM);
     this.root.visible = false;
@@ -94,39 +113,46 @@ export class RightHandRig {
       points[12][1] - points[0][1],
       points[12][2] - points[0][2],
     );
-    const desired = Math.min(2.2, Math.max(0.25, length / this.restLength));
+    const desired = Math.min(4, Math.max(0.05, length / this.restLength));
     if (!this.sized) {
       this.shownScale = desired;
       this.sized = true;
     } else {
-      this.shownScale += (desired - this.shownScale) * 0.4;
+      this.shownScale += (desired - this.shownScale) * 0.45;
     }
-    this.root.scale.setScalar(this.shownScale);
-    this.aimPalm(points);
+    this.placeRoot(points);
     for (const link of LINKS) this.aimLink(link.name, points[link.from], points[link.to]);
     this.root.updateMatrixWorld(true);
     this.pin(points[0]);
+    this.root.updateMatrixWorld(true);
+    for (const mesh of this.meshes) mesh.skeleton.update();
   }
 
-  /** Local +Y toward the middle knuckle, local +X toward the thumb side. */
-  private aimPalm(points: Vec3[]): void {
-    const bone = this.bones.get(PALM);
-    if (!bone?.parent) return;
+  /** Move the whole bind-pose hand onto the wrist before the fingers curl. */
+  private placeRoot(points: Vec3[]): void {
     this.y.set(points[9][0] - points[0][0], points[9][1] - points[0][1], points[9][2] - points[0][2]);
     this.x.set(points[5][0] - points[17][0], points[5][1] - points[17][1], points[5][2] - points[17][2]);
     if (this.y.lengthSq() < 1e-8 || this.x.lengthSq() < 1e-8) return;
-    this.y.normalize();
-    this.x.normalize();
-    this.z.crossVectors(this.x, this.y);
-    if (this.z.lengthSq() < 1e-8) return;
-    this.z.normalize();
-    this.x.crossVectors(this.y, this.z).normalize();
-    this.basis.makeBasis(this.x, this.y, this.z);
-    this.worldQuat.setFromRotationMatrix(this.basis);
-    bone.parent.updateWorldMatrix(true, false);
-    bone.parent.getWorldQuaternion(this.parentQuat);
-    bone.quaternion.copy(this.parentQuat.invert()).multiply(this.worldQuat);
-    bone.updateMatrixWorld(true);
+    this.compose(this.x, this.y, this.worldQuat);
+    this.delta.copy(this.restBasis).invert();
+    this.root.quaternion.copy(this.worldQuat).multiply(this.delta);
+    this.root.scale.setScalar(this.shownScale);
+    this.z.copy(this.restWrist).multiplyScalar(this.shownScale).applyQuaternion(this.root.quaternion);
+    this.root.position.set(points[0][0] - this.z.x, points[0][1] - this.z.y, points[0][2] - this.z.z);
+    this.root.updateMatrixWorld(true);
+  }
+
+  private compose(across: Vector3, finger: Vector3, out: Quaternion): void {
+    this.dir.copy(finger).normalize();
+    this.restDir.copy(across).normalize();
+    this.parentQuat.set(0, 0, 0, 1);
+    const z = this.z;
+    z.crossVectors(this.restDir, this.dir);
+    if (z.lengthSq() < 1e-6) z.set(0, 0, 1);
+    else z.normalize();
+    this.restDir.crossVectors(this.dir, z).normalize();
+    this.basis.makeBasis(this.restDir, this.dir, z);
+    out.setFromRotationMatrix(this.basis);
   }
 
   private aimLink(name: string, from: Vec3 | undefined, to: Vec3 | undefined): void {
