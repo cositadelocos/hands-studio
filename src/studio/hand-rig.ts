@@ -3,24 +3,24 @@ import type { Vec3 } from "@/studio/math";
 
 /** Mixamo right-hand bone → MediaPipe landmark pair it should point along. */
 const LINKS: { name: string; from: number; to: number }[] = [
-  { name: "mixamorig:RightHandThumb1", from: 1, to: 2 },
-  { name: "mixamorig:RightHandThumb2", from: 2, to: 3 },
-  { name: "mixamorig:RightHandThumb3", from: 3, to: 4 },
-  { name: "mixamorig:RightHandIndex1", from: 5, to: 6 },
-  { name: "mixamorig:RightHandIndex2", from: 6, to: 7 },
-  { name: "mixamorig:RightHandIndex3", from: 7, to: 8 },
-  { name: "mixamorig:RightHandMiddle1", from: 9, to: 10 },
-  { name: "mixamorig:RightHandMiddle2", from: 10, to: 11 },
-  { name: "mixamorig:RightHandMiddle3", from: 11, to: 12 },
-  { name: "mixamorig:RightHandRing1", from: 13, to: 14 },
-  { name: "mixamorig:RightHandRing2", from: 14, to: 15 },
-  { name: "mixamorig:RightHandRing3", from: 15, to: 16 },
-  { name: "mixamorig:RightHandPinky1", from: 17, to: 18 },
-  { name: "mixamorig:RightHandPinky2", from: 18, to: 19 },
-  { name: "mixamorig:RightHandPinky3", from: 19, to: 20 },
+  { name: "mixamorigRightHandThumb1", from: 1, to: 2 },
+  { name: "mixamorigRightHandThumb2", from: 2, to: 3 },
+  { name: "mixamorigRightHandThumb3", from: 3, to: 4 },
+  { name: "mixamorigRightHandIndex1", from: 5, to: 6 },
+  { name: "mixamorigRightHandIndex2", from: 6, to: 7 },
+  { name: "mixamorigRightHandIndex3", from: 7, to: 8 },
+  { name: "mixamorigRightHandMiddle1", from: 9, to: 10 },
+  { name: "mixamorigRightHandMiddle2", from: 10, to: 11 },
+  { name: "mixamorigRightHandMiddle3", from: 11, to: 12 },
+  { name: "mixamorigRightHandRing1", from: 13, to: 14 },
+  { name: "mixamorigRightHandRing2", from: 14, to: 15 },
+  { name: "mixamorigRightHandRing3", from: 15, to: 16 },
+  { name: "mixamorigRightHandPinky1", from: 17, to: 18 },
+  { name: "mixamorigRightHandPinky2", from: 18, to: 19 },
+  { name: "mixamorigRightHandPinky3", from: 19, to: 20 },
 ];
 
-const PALM = "mixamorig:RightHand";
+const PALM = "mixamorigRightHand";
 
 interface RestBone {
   quat: Quaternion;
@@ -58,7 +58,10 @@ export class RightHandRig {
     this.root.add(gltf.scene);
     gltf.scene.traverse((obj) => {
       obj.frustumCulled = false;
-      if ((obj as Bone).isBone) this.bones.set(obj.name, obj as Bone);
+      if ((obj as Bone).isBone) {
+        this.bones.set(obj.name, obj as Bone);
+        this.bones.set(obj.name.replace(/[^A-Za-z0-9_]/g, ""), obj as Bone);
+      }
       if ((obj as SkinnedMesh).isSkinnedMesh) {
         const mesh = obj as SkinnedMesh;
         const previous = mesh.material as MeshBasicMaterial;
@@ -82,10 +85,10 @@ export class RightHandRig {
       this.rest.set(name, { quat: bone.quaternion.clone(), localDir });
     }
     const wrist = this.bones.get(PALM);
-    const mid = this.bones.get("mixamorig:RightHandMiddle1");
-    const index = this.bones.get("mixamorig:RightHandIndex1");
-    const pinky = this.bones.get("mixamorig:RightHandPinky1");
-    const tip = this.bones.get("mixamorig:RightHandMiddle4");
+    const mid = this.bones.get("mixamorigRightHandMiddle1");
+    const index = this.bones.get("mixamorigRightHandIndex1");
+    const pinky = this.bones.get("mixamorigRightHandPinky1");
+    const tip = this.bones.get("mixamorigRightHandMiddle4");
     if (wrist && mid && index && pinky && tip) {
       wrist.getWorldPosition(this.restWrist);
       mid.getWorldPosition(this.y);
