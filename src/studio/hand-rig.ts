@@ -55,6 +55,11 @@ export class RightHandRig {
   private readonly palmNormal = new Vector3();
   private readonly aim = new Vector3();
   private readonly up = new Vector3();
+  private readonly capsA = LINKS.map(() => new Vector3());
+  private readonly capsB = LINKS.map(() => new Vector3());
+  private readonly hitA = new Vector3();
+  private readonly hitB = new Vector3();
+  private readonly push = new Vector3();
 
   async load(url: string): Promise<void> {
     const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
@@ -150,6 +155,7 @@ export class RightHandRig {
     this.pin(points[0]);
     this.root.position.y -= length * 0.46;
     this.root.updateMatrixWorld(true);
+    this.separateFingers();
   }
 
   /** Thumb side follows the thumb landmark. Fingers follow the middle knuckle. */
@@ -208,5 +214,129 @@ export class RightHandRig {
     this.root.position.x += wrist[0] - this.x.x;
     this.root.position.y += wrist[1] - this.x.y;
     this.root.position.z += wrist[2] - this.x.z;
+  }
+
+  /** Keep neighboring fingers from passing through each other. Pose and bones stay as tracked. */
+  private separateFingers(): void {
+    for (let pass = 0; pass < 2; pass += 1) {
+      this.readCapsules();
+      let moved = false;
+      for (let i = 0; i < LINKS.length; i += 1) {
+        for (let j = i + 1; j < LINKS.length; j += 1) {
+          const fingerI = Math.floor(i / 3);
+          const fingerJ = Math.floor(j / 3);
+          if (Math.abs(fingerI - fingerJ) !== 1) continue;
+          const lenI = this.capsA[i].distanceTo(this.capsB[i]);
+          const lenJ = this.capsA[j].distanceTo(this.capsB[j]);
+          if (lenI < 1e-4 || lenJ < 1e-4) continue;
+          const radius = Math.min(lenI, lenJ) * 0.3;
+          const dist = this.closestSegments(this.capsA[i], this.capsB[i], this.capsA[j], this.capsB[j]);
+          const overlap = radius * 2 - dist;
+          if (overlap <= 0.0005) continue;
+          const alongI = this.hitA.distanceTo(this.capsA[i]) / lenI;
+          const alongJ = this.hitB.distanceTo(this.capsA[j]) / lenJ;
+          if (alongI < 0.22 && alongJ < 0.22) continue;
+          this.push.copy(this.hitA).sub(this.hitB);
+          if (this.push.lengthSq() < 1e-8) continue;
+          this.push.normalize();
+          const shift = overlap * 0.4;
+          this.nudgeBone(LINKS[i].name, this.capsA[i], this.capsB[i], this.push, shift);
+          this.nudgeBone(LINKS[j].name, this.capsA[j], this.capsB[j], this.push, -shift);
+          moved = true;
+        }
+      }
+      if (!moved) break;
+      this.root.updateMatrixWorld(true);
+    }
+  }
+
+  private readCapsules(): void {
+    for (let i = 0; i < LINKS.length; i += 1) {
+      const link = LINKS[i];
+      const bone = link ? this.bones.get(link.name) : undefined;
+      const child = bone?.children.find((item) => (item as Bone).isBone) as Bone | undefined;
+      if (!bone || !child) {
+        this.capsA[i].set(0, 0, 0);
+        this.capsB[i].set(0, 0, 0);
+        continue;
+      }
+      bone.getWorldPosition(this.capsA[i]);
+      child.getWorldPosition(this.capsB[i]);
+    }
+  }
+
+  private closestSegments(a0: Vector3, a1: Vector3, b0: Vector3, b1: Vector3): number {
+    this.dir.copy(a1).sub(a0);
+    this.restDir.copy(b1).sub(b0);
+    this.z.copy(a0).sub(b0);
+    const aa = this.dir.dot(this.dir);
+    const bb = this.dir.dot(this.restDir);
+    const cc = this.restDir.dot(this.restDir);
+    const dd = this.dir.dot(this.z);
+    const ee = this.restDir.dot(this.z);
+    const denom = aa * cc - bb * bb;
+    let sN = 0;
+    let sD = denom;
+    let tN = 0;
+    let tD = denom;
+    if (denom < 1e-8) {
+      sN = 0;
+      sD = 1;
+      tN = ee;
+      tD = cc;
+    } else {
+      sN = bb * ee - cc * dd;
+      tN = aa * ee - bb * dd;
+      if (sN < 0) {
+        sN = 0;
+        tN = ee;
+        tD = cc;
+      } else if (sN > sD) {
+        sN = sD;
+        tN = ee + bb;
+        tD = cc;
+      }
+    }
+    if (tN < 0) {
+      tN = 0;
+      if (-dd < 0) sN = 0;
+      else if (-dd > aa) sN = sD;
+      else {
+        sN = -dd;
+        sD = aa;
+      }
+    } else if (tN > tD) {
+      tN = tD;
+      if (-dd + bb < 0) sN = 0;
+      else if (-dd + bb > aa) sN = sD;
+      else {
+        sN = -dd + bb;
+        sD = aa;
+      }
+    }
+    const sc = Math.abs(sD) < 1e-8 ? 0 : sN / sD;
+    const tc = Math.abs(tD) < 1e-8 ? 0 : tN / tD;
+    this.hitA.copy(a0).addScaledVector(this.dir, sc);
+    this.hitB.copy(b0).addScaledVector(this.restDir, tc);
+    return this.hitA.distanceTo(this.hitB);
+  }
+
+  private nudgeBone(name: string, from: Vector3, to: Vector3, push: Vector3, amount: number): void {
+    const bone = this.bones.get(name);
+    if (!bone?.parent) return;
+    this.aim.copy(to).sub(from);
+    const len = this.aim.length();
+    if (len < 1e-4) return;
+    this.aim.multiplyScalar(1 / len);
+    const shift = Math.max(-len * 0.18, Math.min(len * 0.18, amount));
+    this.up.copy(this.aim).addScaledVector(push, shift / len);
+    if (this.up.lengthSq() < 1e-8) return;
+    this.up.normalize();
+    this.delta.setFromUnitVectors(this.aim, this.up);
+    bone.parent.getWorldQuaternion(this.parentQuat);
+    bone.quaternion.premultiply(this.parentQuat);
+    bone.quaternion.premultiply(this.delta);
+    this.parentQuat.invert();
+    bone.quaternion.premultiply(this.parentQuat);
   }
 }
