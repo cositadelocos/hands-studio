@@ -35,7 +35,6 @@ export class RightHandRig {
   readonly root = new Group();
   ready = false;
   private readonly bones = new Map<string, Bone>();
-  private readonly meshes: SkinnedMesh[] = [];
   private readonly rest = new Map<string, RestBone>();
   private readonly restWrist = new Vector3();
   private readonly restBasis = new Quaternion();
@@ -73,7 +72,6 @@ export class RightHandRig {
         mesh.frustumCulled = false;
         mesh.castShadow = false;
         mesh.receiveShadow = false;
-        this.meshes.push(mesh);
       }
     });
     this.root.updateMatrixWorld(true);
@@ -116,7 +114,7 @@ export class RightHandRig {
       points[12][1] - points[0][1],
       points[12][2] - points[0][2],
     );
-    const desired = Math.min(4, Math.max(0.05, length / this.restLength));
+    const desired = Math.min(4, Math.max(0.05, (length / this.restLength) * 1.08));
     if (!this.sized) {
       this.shownScale = desired;
       this.sized = true;
@@ -124,11 +122,15 @@ export class RightHandRig {
       this.shownScale += (desired - this.shownScale) * 0.45;
     }
     this.placeRoot(points);
-    for (const link of LINKS) this.aimLink(link.name, points[link.from], points[link.to]);
-    this.root.updateMatrixWorld(true);
+    for (let step = 0; step < 3; step += 1) {
+      for (let index = step; index < LINKS.length; index += 3) {
+        const link = LINKS[index];
+        this.aimLink(link.name, points[link.from], points[link.to]);
+      }
+      this.root.updateMatrixWorld(true);
+    }
     this.pin(points[0]);
     this.root.updateMatrixWorld(true);
-    for (const mesh of this.meshes) mesh.skeleton.update();
   }
 
   /** Move the whole bind-pose hand onto the wrist before the fingers curl. */
@@ -165,14 +167,12 @@ export class RightHandRig {
     this.dir.set(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
     if (this.dir.lengthSq() < 1e-8) return;
     this.dir.normalize();
-    bone.parent.updateWorldMatrix(true, false);
     bone.parent.getWorldQuaternion(this.parentQuat);
     this.dir.applyQuaternion(this.parentQuat.invert());
     this.restDir.copy(rest.localDir).applyQuaternion(rest.quat);
     if (this.restDir.lengthSq() < 1e-8 || this.dir.lengthSq() < 1e-8) return;
     this.delta.setFromUnitVectors(this.restDir.normalize(), this.dir.normalize());
     bone.quaternion.copy(this.delta).multiply(rest.quat);
-    bone.updateMatrixWorld(true);
   }
 
   private pin(wrist: Vec3): void {
