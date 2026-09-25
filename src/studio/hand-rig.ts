@@ -131,7 +131,7 @@ export class RightHandRig {
       points[9][1] - points[0][1],
       points[9][2] - points[0][2],
     );
-    const desired = Math.min(4, Math.max(0.05, (length / this.restKnuckle) * 0.85));
+    const desired = Math.min(4, Math.max(0.05, (length / this.restKnuckle) * 1.28));
     if (!this.sized) {
       this.shownScale = desired;
       this.sized = true;
