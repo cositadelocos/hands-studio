@@ -151,13 +151,11 @@ export class RightHandRig {
     this.root.updateMatrixWorld(true);
   }
 
-  /** Palm faces the studio so the thumb sits on its landmarks. */
-  private placeRoot(points: Vec3[], intoStudio?: Vector3): void {
+  /** Keep the thumb on the same side as its landmarks. No extra roll. */
+  private placeRoot(points: Vec3[], _intoStudio?: Vector3): void {
     this.y.set(points[9][0] - points[0][0], points[9][1] - points[0][1], points[9][2] - points[0][2]);
     this.x.set(points[5][0] - points[17][0], points[5][1] - points[17][1], points[5][2] - points[17][2]);
     if (this.y.lengthSq() < 1e-8 || this.x.lengthSq() < 1e-8) return;
-    this.dir.crossVectors(this.x, this.y);
-    if (intoStudio && this.dir.dot(intoStudio) < 0) this.x.negate();
     this.compose(this.x, this.y, this.worldQuat);
     this.delta.copy(this.restBasis).invert();
     this.root.quaternion.copy(this.worldQuat).multiply(this.delta);
@@ -193,6 +191,10 @@ export class RightHandRig {
     this.restDir.copy(rest.localDir).applyQuaternion(rest.quat);
     if (this.restDir.lengthSq() < 1e-8) return;
     this.delta.setFromUnitVectors(this.restDir.normalize(), this.aim);
+    if (this.delta.w < 0.25) {
+      bone.quaternion.copy(rest.quat);
+      return;
+    }
     bone.quaternion.copy(this.delta).multiply(rest.quat);
   }
 
